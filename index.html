@@ -99,6 +99,45 @@ header {
 .dropdown-item .di-icon { font-size: 1rem; flex-shrink: 0; width: 22px; text-align: center; }
 .dropdown-item .di-name { font-size: 0.62rem; letter-spacing: 0.06em; color: var(--white); }
 .dropdown-item .di-coords { font-size: 0.5rem; letter-spacing: 0.08em; color: var(--foam); opacity: 0.5; margin-top: 1px; }
+.dropdown-item .di-delete-btn {
+  margin-left: 0.4rem; flex-shrink: 0; background: none; border: none; cursor: pointer;
+  font-size: 0.7rem; color: var(--foam); opacity: 0.3; padding: 2px 4px; border-radius: 3px;
+  transition: opacity 0.15s, color 0.15s, background 0.15s; line-height: 1;
+}
+.dropdown-item .di-delete-btn:hover { opacity: 1; color: var(--rust); background: rgba(192,57,43,0.12); }
+.dropdown-divider { height: 1px; background: rgba(74,144,217,0.1); margin: 0; }
+
+/* Map overlay save-pin button — added via Leaflet control so it's always above tiles */
+.map-pin-btn {
+  width: 34px; height: 34px; border-radius: 4px;
+  background: rgba(8,18,40,0.82); border: 1px solid rgba(74,144,217,0.35);
+  color: var(--foam); font-size: 1.1rem; line-height: 1;
+  cursor: pointer; backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.15s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  pointer-events: all;
+}
+.map-pin-btn:hover { background: rgba(232,160,48,0.18); border-color: var(--amber); color: var(--amber); transform: scale(1.08); }
+.map-pin-btn.is-pinned { color: var(--amber); border-color: rgba(232,160,48,0.6); background: rgba(232,160,48,0.14); }
+
+/* Green preset-location pins on map */
+.green-pin {
+  width: 14px; height: 14px; background: var(--green);
+  border: 2.5px solid var(--white); border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(39,174,96,0.7);
+  animation: gpPulse 2.8s ease-out infinite;
+  cursor: pointer; transition: transform 0.15s;
+}
+.green-pin:hover { transform: scale(1.45); }
+.green-pin.is-active { background: #80e8a0; box-shadow: 0 0 10px rgba(39,174,96,0.9); animation: none; }
+@keyframes gpPulse { 0%{box-shadow:0 0 0 0 rgba(39,174,96,0.7)} 70%{box-shadow:0 0 0 12px rgba(39,174,96,0)} 100%{box-shadow:0 0 0 0 rgba(39,174,96,0)} }
+
+/* Green location dot in dropdown */
+.di-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 7px var(--green); flex-shrink: 0; margin-left: auto; opacity: 0; transition: opacity 0.2s; }
+.dropdown-item.is-active .di-dot { opacity: 1; }
+.dropdown-item.is-active { background: rgba(39,174,96,0.08); border-left: 2px solid rgba(39,174,96,0.55); padding-left: calc(1rem - 2px); }
+.dropdown-item.is-active .di-name { color: #80e8a0; }
 
 /* ── Status bar ── */
 .status-bar { display: flex; align-items: center; gap: 0.55rem; padding: 0.65rem 1.1rem; background: rgba(13,32,69,0.5); border: 1px solid rgba(74,144,217,0.1); border-radius: 4px; animation: fadeUp 0.7s 0.1s ease both; }
@@ -550,7 +589,52 @@ let wxHourlyData = null;               // cache hourly forecast
 let tidePredictions = [];              // cache tide hi/lo predictions
 let tideCurveData = [];                // cache 6-min water levels for chart
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Saved Pins ──────────────────────────────────────────────────────────────
+const PINS_KEY = 'coastalConditions_savedPins';
+
+function loadPins() {
+  try { return JSON.parse(localStorage.getItem(PINS_KEY)) || []; } catch { return []; }
+}
+function savePins(pins) {
+  try { localStorage.setItem(PINS_KEY, JSON.stringify(pins)); } catch {}
+}
+function isPinned(lat, lon) {
+  return loadPins().some(p => Math.abs(p.lat - lat) < 0.00001 && Math.abs(p.lon - lon) < 0.00001);
+}
+function togglePinCurrentLocation() {
+  const pins = loadPins();
+  const idx = pins.findIndex(p => Math.abs(p.lat - currentLat) < 0.00001 && Math.abs(p.lon - currentLon) < 0.00001);
+  if (idx >= 0) {
+    pins.splice(idx, 1);
+  } else {
+    pins.unshift({ name: currentName, lat: currentLat, lon: currentLon, icon: '📍' });
+  }
+  savePins(pins);
+  updatePinButton();
+  refreshGreenPins();
+  // Refresh dropdown if open
+  if (document.getElementById('searchDropdown').classList.contains('open')) {
+    buildDropdown(document.getElementById('searchInput').value);
+  }
+}
+function removePin(lat, lon, event) {
+  event.stopPropagation();
+  const pins = loadPins().filter(p => !(Math.abs(p.lat - lat) < 0.00001 && Math.abs(p.lon - lon) < 0.00001));
+  savePins(pins);
+  updatePinButton();
+  refreshGreenPins();
+  buildDropdown(document.getElementById('searchInput').value);
+}
+function updatePinButton() {
+  const btn = document.getElementById('pinLocationBtn');
+  if (!btn) return;
+  const pinned = isPinned(currentLat, currentLon);
+  btn.textContent = pinned ? '★' : '☆';
+  btn.title = pinned ? 'Remove saved location' : 'Save this location';
+  btn.classList.toggle('is-pinned', pinned);
+}
+
+
 const DIR_LABELS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
 const BFT_MPH    = [0,1,4,8,13,19,25,32,39,47,55,64,74];
 const BFT_DESC   = ['Calm','Light air','Light breeze','Gentle breeze','Moderate breeze','Fresh breeze','Strong breeze','Near gale','Gale','Strong gale','Storm','Violent storm','Hurricane'];
@@ -588,6 +672,8 @@ function buildMapIconHTML(speedMph, dirDeg, waterDisplay) {
 }
 
 // ─── Map init ─────────────────────────────────────────────────────────────────
+let greenPinMarkers = []; // track all green preset markers
+
 function initMap() {
   leafletMap = L.map('map',{center:[currentLat,currentLon],zoom:14,zoomControl:true,scrollWheelZoom:true});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
@@ -600,6 +686,24 @@ function initMap() {
     attribution:'Labels © Esri'
   }).addTo(leafletMap);
 
+  // ── Save-pin button as a Leaflet control (always on top) ──
+  const SavePinControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function() {
+      const btn = L.DomUtil.create('button', 'map-pin-btn');
+      btn.id = 'pinLocationBtn';
+      btn.title = 'Save this location';
+      btn.textContent = '☆';
+      L.DomEvent.on(btn, 'click', function(e) {
+        L.DomEvent.stopPropagation(e);
+        togglePinCurrentLocation();
+      });
+      return btn;
+    }
+  });
+  new SavePinControl().addTo(leafletMap);
+
+  // ── Amber active-location marker ──
   const pierIcon = L.divIcon({className:'',html:'<div class="pier-marker"></div>',iconSize:[14,14],iconAnchor:[7,7]});
   pierMarker = L.marker([currentLat,currentLon],{icon:pierIcon,zIndexOffset:100})
     .addTo(leafletMap)
@@ -610,10 +714,52 @@ function initMap() {
     zIndexOffset:500,interactive:false
   }).addTo(leafletMap);
 
+  // ── Green preset-location pins ──
+  addGreenPinMarkers();
+
   leafletMap.on('click',e=>{
     const lat=parseFloat(e.latlng.lat.toFixed(6)), lon=parseFloat(e.latlng.lng.toFixed(6));
     selectLocation(lat,lon,'Custom Location');
   });
+}
+
+function buildGreenPinHTML(isActive) {
+  return `<div class="green-pin${isActive?' is-active':''}"></div>`;
+}
+
+function getAllPinLocations() {
+  // Merge PIERS + saved pins, deduplicating by coords so we don't double-render
+  const all = [...PIERS];
+  loadPins().forEach(sp => {
+    const already = all.some(p => Math.abs(p.lat - sp.lat) < 0.00001 && Math.abs(p.lon - sp.lon) < 0.00001);
+    if (!already) all.push({ name: sp.name, lat: sp.lat, lon: sp.lon, icon: sp.icon || '📍' });
+  });
+  return all;
+}
+
+function addGreenPinMarkers() {
+  // Clear existing
+  greenPinMarkers.forEach(m => leafletMap.removeLayer(m));
+  greenPinMarkers = [];
+
+  getAllPinLocations().forEach(p => {
+    const isActive = Math.abs(p.lat - currentLat) < 0.00001 && Math.abs(p.lon - currentLon) < 0.00001;
+    const icon = L.divIcon({className:'', html: buildGreenPinHTML(isActive), iconSize:[14,14], iconAnchor:[7,7]});
+    const marker = L.marker([p.lat, p.lon], {icon, zIndexOffset:200, title: p.name})
+      .addTo(leafletMap)
+      .bindPopup(`<div style="font-family:Space Mono,monospace;font-size:11px;color:#0a1628;line-height:1.6"><strong>${p.icon} ${p.name}</strong><br>${fmtCoord(p.lat,p.lon)}</div>`,{offset:[0,-8]});
+    marker.on('click', function(e) {
+      L.DomEvent.stopPropagation(e);
+      selectLocation(p.lat, p.lon, p.name, true);
+    });
+    greenPinMarkers.push(marker);
+  });
+}
+
+function refreshGreenPins() {
+  if (!leafletMap) return;
+  // Rebuild fully so saved pins appearing/disappearing are handled
+  addGreenPinMarkers();
 }
 
 function moveMapTo(lat,lon,name) {
@@ -636,29 +782,91 @@ function updateMapIcon() {
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 function buildDropdown(filter='') {
-  const dd=document.getElementById('searchDropdown');
-  const f=filter.toLowerCase().trim();
-  const items=PIERS.filter(p=>!f||p.name.toLowerCase().includes(f));
-  if(!items.length){dd.innerHTML='<div class="dropdown-header">No matching locations</div>';return;}
-  dd.innerHTML='<div class="dropdown-header">Locations</div>'+items.map(p=>`
-    <div class="dropdown-item" onclick="selectLocation(${p.lat},${p.lon},'${p.name.replace(/'/g,"\\'")}')">
-      <span class="di-icon">${p.icon}</span>
-      <span><div class="di-name">${p.name}</div><div class="di-coords">${fmtCoord(p.lat,p.lon)}</div></span>
-    </div>`).join('');
+  const dd = document.getElementById('searchDropdown');
+  const f = filter.toLowerCase().trim();
+  const pins = loadPins();
+  const filteredPiers = PIERS.filter(p => !f || p.name.toLowerCase().includes(f));
+  const filteredPins  = pins.filter(p => !f || p.name.toLowerCase().includes(f));
+
+  let html = '';
+
+  // Saved pins section
+  if (filteredPins.length) {
+    html += '<div class="dropdown-header">★ Saved Locations</div>';
+    html += filteredPins.map(p => {
+      const lat = p.lat, lon = p.lon, name = p.name.replace(/'/g,"\\'");
+      const active = Math.abs(p.lat - currentLat) < 0.00001 && Math.abs(p.lon - currentLon) < 0.00001;
+      return `<div class="dropdown-item${active?' is-active':''}" onclick="selectLocation(${lat},${lon},'${name}',true)">
+        <span class="di-icon">${p.icon || '📍'}</span>
+        <span><div class="di-name">${p.name}</div><div class="di-coords">${fmtCoord(lat,lon)}</div></span>
+        <span class="di-dot"></span>
+        <button class="di-delete-btn" title="Remove saved location" onclick="removePin(${lat},${lon},event)">✕</button>
+      </div>`;
+    }).join('');
+    if (filteredPiers.length) html += '<div class="dropdown-divider"></div>';
+  }
+
+  // Preset locations section — no save/pin buttons
+  if (filteredPiers.length) {
+    html += '<div class="dropdown-header">Locations</div>';
+    html += filteredPiers.map(p => {
+      const active = Math.abs(p.lat - currentLat) < 0.00001 && Math.abs(p.lon - currentLon) < 0.00001;
+      const name = p.name.replace(/'/g,"\\'");
+      return `<div class="dropdown-item${active?' is-active':''}" onclick="selectLocation(${p.lat},${p.lon},'${name}',true)">
+        <span class="di-icon">${p.icon}</span>
+        <span><div class="di-name">${p.name}</div><div class="di-coords">${fmtCoord(p.lat,p.lon)}</div></span>
+        <span class="di-dot"></span>
+      </div>`;
+    }).join('');
+  }
+
+  if (!html) {
+    dd.innerHTML = '<div class="dropdown-header">No matching locations</div>';
+  } else {
+    dd.innerHTML = html;
+  }
 }
 const openDropdown=()=>{buildDropdown(document.getElementById('searchInput').value);document.getElementById('searchDropdown').classList.add('open');};
 const closeDropdown=()=>document.getElementById('searchDropdown').classList.remove('open');
 
-function selectLocation(lat,lon,name) {
-  currentLat=lat;currentLon=lon;currentName=name;
-  document.getElementById('searchInput').value='';
+// ─── Reverse geocode (Nominatim) ──────────────────────────────────────────────
+async function reverseGeocode(lat, lon) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await res.json();
+    const a = data.address || {};
+    // Prefer: village > town > city > county > state
+    return a.village || a.town || a.suburb || a.city || a.county || a.state || 'Custom Location';
+  } catch {
+    return 'Custom Location';
+  }
+}
+
+function selectLocation(lat, lon, name, skipGeocode) {
+  currentLat = lat; currentLon = lon; currentName = name;
+  document.getElementById('searchInput').value = '';
   closeDropdown();
-  document.getElementById('locationName').textContent=name;
-  document.getElementById('coordsDisplay').textContent=fmtCoord(lat,lon);
-  moveMapTo(lat,lon,name);
-  CHART.realNow = null; // re-anchor chart to new fetch time
+  document.getElementById('locationName').textContent = name;
+  document.getElementById('coordsDisplay').textContent = fmtCoord(lat, lon);
+  moveMapTo(lat, lon, name);
+  updatePinButton();
+  refreshGreenPins();
+  CHART.realNow = null;
   setTimeOffset(0);
   fetchAll();
+  // For custom locations, resolve a real place name in the background
+  if (!skipGeocode && name === 'Custom Location') {
+    reverseGeocode(lat, lon).then(resolved => {
+      if (resolved && resolved !== 'Custom Location') {
+        currentName = resolved;
+        document.getElementById('locationName').textContent = resolved;
+        document.getElementById('mapLabelText').textContent = `📍 ${resolved}`;
+        pierMarker.setPopupContent(`<div style="font-family:Space Mono,monospace;font-size:11px;color:#0a1628;line-height:1.6"><strong>${resolved}</strong><br>${fmtCoord(lat,lon)}</div>`);
+        updatePinButton();
+      }
+    });
+  }
 }
 document.getElementById('searchInput').addEventListener('focus',openDropdown);
 document.getElementById('searchInput').addEventListener('input',()=>{buildDropdown(document.getElementById('searchInput').value);document.getElementById('searchDropdown').classList.add('open');});
@@ -1344,6 +1552,7 @@ initMap();
 initForecastScrollDrag();
 initTideChartDrag();
 initTimeSlider();
+updatePinButton();
 fetchAll();
 setInterval(fetchAll,60*1000);
 </script>
