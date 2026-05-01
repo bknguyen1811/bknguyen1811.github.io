@@ -588,7 +588,7 @@ function buildMapIconHTML(speedMph, dirDeg, waterDisplay) {
 
 // ─── Map init ─────────────────────────────────────────────────────────────────
 function initMap() {
-  leafletMap = L.map('map',{center:[currentLat,currentLon],zoom:14,zoomControl:true,scrollWheelZoom:false});
+  leafletMap = L.map('map',{center:[currentLat,currentLon],zoom:14,zoomControl:true,scrollWheelZoom:true});
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
     attribution:'Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics',
     maxZoom:19
@@ -1241,6 +1241,8 @@ function initForecastScrollDrag() {
   window.addEventListener('wheel', function(e) {
     const s = strip();
     if (!s) return;
+    // Don't intercept wheel events over the map — let Leaflet zoom
+    if (e.target && e.target.closest && e.target.closest('#map, .map-card, .leaflet-container')) return;
     const r = s.getBoundingClientRect();
     const overStrip = e.clientX >= r.left && e.clientX <= r.right &&
                       e.clientY >= r.top  && e.clientY <= r.bottom;
