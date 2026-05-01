@@ -529,6 +529,7 @@ footer a { color: var(--steel); }
 // ─── Location presets ─────────────────────────────────────────────────────────
 const PIERS = [
   { name: 'Fort Monroe — Finger Pier', lat: 37.001139,  lon: -76.304278, icon: '⚓' },
+  { name: 'Old Orchard Beach',         lat: 43.514704,  lon: -70.371639, icon: '🏖️' },
   { name: 'The Green Mile Pier',       lat: 36.963922,  lon: -76.409387, icon: '🎣' },
   { name: 'Buckroe Fishing Pier',      lat: 37.036044,  lon: -76.289611, icon: '🎣' },
   { name: 'Ocean View Fishing Pier',   lat: 36.963966,  lon: -76.257437, icon: '🎣' },
@@ -594,6 +595,11 @@ function initMap() {
     maxZoom:19
   }).addTo(leafletMap);
 
+  // Labels overlay
+  L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+    attribution:'Labels © Esri'
+  }).addTo(leafletMap);
+
   const pierIcon = L.divIcon({className:'',html:'<div class="pier-marker"></div>',iconSize:[14,14],iconAnchor:[7,7]});
   pierMarker = L.marker([currentLat,currentLon],{icon:pierIcon,zIndexOffset:100})
     .addTo(leafletMap)
@@ -612,7 +618,9 @@ function initMap() {
 
 function moveMapTo(lat,lon,name) {
   if(!leafletMap) return;
-  leafletMap.setView([lat,lon],14,{animate:true});
+  const distance = Math.abs(lat - currentLat) + Math.abs(lon - currentLon);
+  const zoom = distance > 5 ? 8 : distance > 2 ? 10 : 14;
+  leafletMap.setView([lat,lon], zoom, { animate:true });
   pierMarker.setLatLng([lat,lon]);
   pierMarker.setPopupContent(`<div style="font-family:Space Mono,monospace;font-size:11px;color:#0a1628;line-height:1.6"><strong>${name}</strong><br>${fmtCoord(lat,lon)}</div>`);
   windIconMarker.setLatLng([lat,lon]);
