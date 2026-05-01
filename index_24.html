@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Coastal Conditions · Hampton Roads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --navy:    #0a1628;
+  --deep:    #0d2045;
+  --steel:   #2e5fa3;
+  --sky:     #4a90d9;
+  --foam:    #a8d8f0;
+  --amber:   #e8a030;
+  --rust:    #c0392b;
+  --green:   #27ae60;
+  --teal:    #1a8a8a;
+  --white:   #ffffff;
+  --glass-b: rgba(74,144,217,0.22);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--navy); color: var(--white);
+  font-family: 'Space Mono', monospace;
+  min-height: 100vh; position: relative; overflow-x: hidden;
+}
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 80%, rgba(42,95,163,0.35) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(74,144,217,0.18) 0%, transparent 50%),
+    linear-gradient(180deg, #0a1628 0%, #0d2045 55%, #0a1628 100%);
+  z-index: 0;
+}
+body::after {
+  content: ''; position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events: none; z-index: 1;
+}
+.wave-bg {
+  position: fixed; bottom: 0; left: 0;
+  width: 100%; height: 180px; z-index: 0; opacity: 0.1; overflow: hidden;
+}
+.wave-bg svg { width: 200%; height: 100%; animation: waveScroll 14s linear infinite; }
+@keyframes waveScroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* ── Layout ── */
+.container {
+  position: relative; z-index: 2; max-width: 860px;
+  margin: 0 auto; padding: 1.8rem 1.4rem 3rem;
+  display: flex; flex-direction: column; gap: 1.2rem;
+}
+
+/* ── Header ── */
+header {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding-bottom: 1.4rem; border-bottom: 1px solid rgba(168,216,240,0.12);
+  animation: fadeDown 0.7s ease both;
+}
+.site-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.6rem,7vw,4.5rem);
+  letter-spacing: 0.06em; line-height: 1; color: var(--white);
+  text-shadow: 0 0 40px rgba(74,144,217,0.6);
+}
+.site-sub { font-size: 0.62rem; letter-spacing: 0.25em; color: var(--foam); text-transform: uppercase; margin-top: 0.3rem; opacity: 0.75; }
+#locationName { margin-top: 0.5rem; font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; letter-spacing: 0.1em; color: var(--sky); opacity: 0.9; min-height: 1.4rem; }
+.coords { margin-top: 0.2rem; font-size: 0.55rem; color: var(--steel); letter-spacing: 0.14em; }
+.timestamp { font-size: 0.55rem; color: var(--amber); letter-spacing: 0.12em; margin-top: 0.4rem; animation: pulse 3s ease-in-out infinite; }
+.unit-toggle { margin-top: 0.55rem; font-size: 0.52rem; letter-spacing: 0.14em; color: var(--foam); opacity: 0.5; cursor: pointer; border: 1px solid rgba(168,216,240,0.2); padding: 2px 8px; border-radius: 3px; transition: opacity 0.2s; text-transform: uppercase; }
+.unit-toggle:hover { opacity: 1; }
+
+/* ── Search bar ── */
+.search-wrap { position: relative; z-index: 50; animation: fadeUp 0.65s 0.05s ease both; }
+.search-input {
+  width: 100%; background: rgba(13,32,69,0.75); border: 1px solid var(--glass-b);
+  border-radius: 4px; padding: 0.75rem 1rem 0.75rem 2.8rem;
+  font-family: 'Space Mono', monospace; font-size: 0.65rem; letter-spacing: 0.08em;
+  color: var(--white); outline: none; transition: border-color 0.25s, box-shadow 0.25s;
+}
+.search-input::placeholder { color: rgba(168,216,240,0.4); }
+.search-input:focus { border-color: rgba(74,144,217,0.55); box-shadow: 0 0 0 3px rgba(74,144,217,0.12); }
+.search-icon { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); font-size: 0.85rem; opacity: 0.45; pointer-events: none; }
+.search-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 9999;
+  background: rgba(10,22,40,0.98); border: 1px solid rgba(74,144,217,0.35);
+  border-radius: 4px; overflow: hidden; display: none;
+  backdrop-filter: blur(20px); box-shadow: 0 16px 48px rgba(0,0,0,0.75);
+}
+.search-dropdown.open { display: block; }
+.dropdown-header { padding: 0.5rem 1rem 0.3rem; font-size: 0.5rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--foam); opacity: 0.45; border-bottom: 1px solid rgba(74,144,217,0.1); }
+.dropdown-item { display: flex; align-items: center; gap: 0.8rem; padding: 0.65rem 1rem; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid rgba(74,144,217,0.06); }
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:hover { background: rgba(74,144,217,0.12); }
+.dropdown-item .di-icon { font-size: 1rem; flex-shrink: 0; width: 22px; text-align: center; }
+.dropdown-item .di-name { font-size: 0.62rem; letter-spacing: 0.06em; color: var(--white); }
+.dropdown-item .di-coords { font-size: 0.5rem; letter-spacing: 0.08em; color: var(--foam); opacity: 0.5; margin-top: 1px; }
+
+/* ── Status bar ── */
+.status-bar { display: flex; align-items: center; gap: 0.55rem; padding: 0.65rem 1.1rem; background: rgba(13,32,69,0.5); border: 1px solid rgba(74,144,217,0.1); border-radius: 4px; animation: fadeUp 0.7s 0.1s ease both; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); flex-shrink: 0; }
+.status-dot.loading { background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: pulse 1s infinite; }
+.status-dot.error   { background: var(--rust);  box-shadow: 0 0 8px var(--rust); }
+.status-text { font-size: 0.57rem; letter-spacing: 0.1em; color: var(--foam); opacity: 0.75; }
+
+/* ── Cards grid ── */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; }
+.card {
+  background: rgba(13,32,69,0.7); border: 1px solid var(--glass-b); border-radius: 4px;
+  padding: 1.4rem 1.2rem 1.2rem; position: relative; overflow: hidden;
+  backdrop-filter: blur(8px); transition: border-color 0.28s, transform 0.28s, box-shadow 0.28s;
+  animation: fadeUp 0.65s ease both;
+}
+.card:nth-child(1){animation-delay:0.1s}.card:nth-child(2){animation-delay:0.2s}
+.card:nth-child(3){animation-delay:0.3s}.card:nth-child(4){animation-delay:0.4s}
+.card:nth-child(5){animation-delay:0.5s}.card:nth-child(6){animation-delay:0.6s}
+.card:hover { border-color: rgba(74,144,217,0.55); transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg,transparent,var(--sky),transparent); opacity: 0; transition: opacity 0.28s; }
+.card:hover::before { opacity: 1; }
+.card.water-card::before { background: linear-gradient(90deg,transparent,#1a8a8a,transparent); }
+.card.water-card:hover { border-color: rgba(26,138,138,0.55); }
+.card.tide-card::before { background: linear-gradient(90deg,transparent,#6a5acd,transparent); }
+.card.tide-card:hover { border-color: rgba(106,90,205,0.55); }
+
+.card-label { font-size: 0.55rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--foam); opacity: 0.55; margin-bottom: 0.75rem; }
+.card-value { font-family: 'Bebas Neue', sans-serif; font-size: 3.1rem; line-height: 1; color: var(--white); text-shadow: 0 0 22px rgba(74,144,217,0.4); }
+.card.water-card .card-value { text-shadow: 0 0 22px rgba(26,138,138,0.5); }
+.card-unit { font-family: 'Space Mono', monospace; font-size: 0.68rem; color: var(--foam); opacity: 0.65; margin-left: 3px; }
+.card-sub { margin-top: 0.4rem; font-size: 0.57rem; color: var(--foam); opacity: 0.62; line-height: 1.55; }
+
+/* Beaufort bar */
+.bft-bar { display: flex; gap: 3px; margin-top: 0.55rem; }
+.bft-seg { height: 5px; flex: 1; border-radius: 1px; background: rgba(74,144,217,0.12); transition: background 0.5s; }
+.bft-seg.active { background: var(--sky); }
+.bft-seg.warn   { background: var(--amber); }
+.bft-seg.danger { background: var(--rust); }
+
+/* Compass */
+.compass-wrap { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.5rem; }
+.compass { width: 50px; height: 50px; flex-shrink: 0; }
+.compass-ring { fill: none; stroke: rgba(74,144,217,0.28); stroke-width: 1.5; }
+.compass-arrow { fill: var(--amber); filter: drop-shadow(0 0 4px rgba(232,160,48,0.8)); transform-origin: 25px 25px; transition: transform 1s ease; }
+
+/* ── Tide card — full width, outside the grid ── */
+.tide-card-full {
+  background: rgba(13,32,69,0.7); border: 1px solid rgba(106,90,205,0.35); border-radius: 4px;
+  padding: 1.4rem 1.4rem 1.3rem; position: relative; overflow: hidden;
+  backdrop-filter: blur(8px); transition: border-color 0.28s;
+  animation: fadeUp 0.65s 0.6s ease both;
+}
+.tide-card-full:hover { border-color: rgba(106,90,205,0.6); }
+.tide-card-full::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,#6a5acd,transparent); }
+
+/* ── Time Navigator ── */
+.time-nav {
+  background: rgba(13,32,69,0.7); border: 1px solid var(--glass-b); border-radius: 4px;
+  padding: 1rem 1.4rem; animation: fadeUp 0.65s 0.7s ease both;
+}
+.time-nav-label { font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--foam); opacity: 0.5; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between; }
+.time-nav-current { color: var(--amber); opacity: 1; font-size: 0.6rem; }
+.time-nav-row { display: flex; align-items: center; gap: 0.7rem; }
+.time-nav-btn {
+  background: rgba(74,144,217,0.1); border: 1px solid rgba(74,144,217,0.3);
+  color: var(--foam); font-family: 'Space Mono', monospace; font-size: 0.58rem;
+  padding: 0.35rem 0.7rem; border-radius: 3px; cursor: pointer; white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s; letter-spacing: 0.08em; flex-shrink: 0;
+}
+.time-nav-btn:hover { background: rgba(74,144,217,0.2); border-color: var(--sky); color: var(--white); }
+.time-nav-btn.active { background: rgba(74,144,217,0.25); border-color: var(--sky); color: var(--white); }
+/* Custom time slider — replaces <input type=range> so we control all events */
+.custom-slider-wrap {
+  flex: 1; padding: 10px 0; cursor: pointer; touch-action: none; user-select: none;
+}
+.custom-slider-track {
+  position: relative; height: 4px; border-radius: 2px;
+  background: rgba(74,144,217,0.2);
+}
+.custom-slider-fill {
+  position: absolute; left: 50%; top: 0; height: 100%;
+  border-radius: 2px; background: var(--sky);
+  transition: left 0.1s, width 0.1s;
+  width: 0;
+}
+.custom-slider-thumb {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--sky); border: 2px solid var(--white);
+  box-shadow: 0 0 8px rgba(74,144,217,0.6);
+  transition: left 0.1s;
+}
+.time-offset-badge { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.1em; color: var(--amber); min-width: 60px; text-align: center; flex-shrink: 0; }
+.time-nav-presets { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.6rem; }
+.time-preset-btn {
+  background: transparent; border: 1px solid rgba(74,144,217,0.2);
+  color: var(--foam); font-family: 'Space Mono', monospace; font-size: 0.5rem;
+  padding: 0.22rem 0.55rem; border-radius: 3px; cursor: pointer; opacity: 0.65;
+  transition: all 0.15s; letter-spacing: 0.07em;
+}
+.time-preset-btn:hover { opacity: 1; border-color: var(--sky); color: var(--white); background: rgba(74,144,217,0.12); }
+.time-preset-btn.active { opacity: 1; background: rgba(74,144,217,0.2); border-color: var(--sky); color: var(--white); }
+
+/* Tide layout inside full card */
+.tide-top { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; margin-bottom: 1rem; }
+.tide-top-left { flex: 0 0 auto; }
+.tide-top-right { flex: 1; min-width: 180px; }
+
+/* Tide SVG chart */
+.tide-chart-wrap { margin-top: 0.8rem; position: relative; }
+.tide-chart-label { font-size: 0.5rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--foam); opacity: 0.4; margin-bottom: 0.4rem; display: flex; justify-content: space-between; }
+#tideChartSvg { width: 100%; height: 110px; display: block; }
+.tide-now-line { stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 4 3; }
+
+/* Tide events grid (2 cols) */
+.tide-events-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1rem; margin-top: 0.5rem; }
+.tide-event-row { display: flex; align-items: center; gap: 0.45rem; font-size: 0.54rem; line-height: 1.3; }
+.tide-event-icon { font-size: 0.75rem; width: 16px; text-align: center; flex-shrink: 0; }
+.tide-event-label { color: var(--foam); opacity: 0.5; font-size: 0.46rem; letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0; width: 52px; }
+.tide-event-time  { color: var(--white); }
+.tide-event-ht    { margin-left: auto; color: #b0a0ff; font-size: 0.5rem; white-space: nowrap; }
+
+/* Forecast panel */
+.forecast-panel { margin-top: 1rem; border-top: 1px solid rgba(74,144,217,0.1); padding-top: 1rem; }
+.forecast-label { font-size: 0.5rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--foam); opacity: 0.4; margin-bottom: 0.6rem; }
+.forecast-scroll {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  padding-bottom: 0.4rem;
+  cursor: grab;
+  user-select: none;
+  overscroll-behavior: contain;
+  touch-action: pan-x;
+  /* Fixed height forces browser to treat this as a scroll container, not the page */
+  height: 110px;
+  align-items: stretch;
+}
+.forecast-scroll.is-dragging { cursor: grabbing; }
+.forecast-scroll::-webkit-scrollbar { height: 3px; }
+.forecast-scroll::-webkit-scrollbar-track { background: rgba(74,144,217,0.05); }
+.forecast-scroll::-webkit-scrollbar-thumb { background: rgba(74,144,217,0.25); border-radius: 2px; }
+
+/* Tide chart — draggable to scrub time, pointer capture prevents page scroll */
+#tideChartSvg { cursor: ew-resize; touch-action: none; user-select: none; display: block; }
+.tide-chart-drag-hint { font-size: 0.44rem; color: var(--foam); opacity: 0.35; margin-left: 0.5rem; }
+.forecast-chip {
+  flex: 0 0 auto; scroll-snap-align: start;
+  background: rgba(13,32,69,0.55); border: 1px solid rgba(74,144,217,0.12);
+  border-radius: 4px; padding: 0.55rem 0.7rem; text-align: center; min-width: 68px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+}
+.forecast-chip.is-selected {
+  border-color: var(--amber) !important;
+  background: rgba(232,160,48,0.12) !important;
+  opacity: 1 !important;
+}
+.forecast-chip:hover:not(.is-selected) { border-color: rgba(74,144,217,0.4); background: rgba(74,144,217,0.08); }
+.forecast-chip.is-now { border-color: var(--amber); background: rgba(232,160,48,0.08); }
+.forecast-chip.is-past { opacity: 0.5; }
+.forecast-chip .fc-time { font-size: 0.48rem; color: var(--foam); opacity: 0.5; letter-spacing: 0.08em; margin-bottom: 0.3rem; }
+.forecast-chip .fc-temp { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; line-height: 1; color: var(--white); }
+.forecast-chip .fc-wind { font-size: 0.46rem; color: var(--foam); opacity: 0.6; margin-top: 0.2rem; }
+.forecast-chip .fc-wave { font-size: 0.44rem; color: #7dd8d8; opacity: 0.7; margin-top: 0.1rem; }
+
+/* Tide status */
+.tide-status-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+.tide-direction-badge { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.08em; padding: 0.1rem 0.5rem; border-radius: 3px; background: rgba(106,90,205,0.2); border: 1px solid rgba(106,90,205,0.4); color: #b0a0ff; }
+.tide-direction-badge.incoming { background: rgba(39,174,96,0.2); border-color: rgba(39,174,96,0.4); color: #80e8a0; }
+.tide-direction-badge.outgoing { background: rgba(192,57,43,0.2); border-color: rgba(192,57,43,0.4); color: #ff9080; }
+.tide-current-ft { font-family: 'Bebas Neue', sans-serif; font-size: 2.6rem; line-height: 1; color: var(--white); text-shadow: 0 0 18px rgba(106,90,205,0.5); }
+.tide-current-unit { font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--foam); opacity: 0.6; margin-left: 3px; }
+
+/* Tide bar */
+.tide-bar-wrap { margin: 0.6rem 0 0.5rem; }
+.tide-bar-track { height: 6px; background: rgba(106,90,205,0.15); border-radius: 3px; position: relative; overflow: visible; }
+.tide-bar-fill { height: 100%; border-radius: 3px; transition: width 1s ease; background: linear-gradient(90deg,#6a5acd,#a090ff); }
+.tide-bar-thumb { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 10px; height: 10px; border-radius: 50%; background: white; border: 2px solid #a090ff; box-shadow: 0 0 6px rgba(160,144,255,0.7); transition: left 1s ease; }
+.tide-bar-labels { display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.47rem; color: var(--foam); opacity: 0.45; letter-spacing: 0.08em; }
+
+/* ── Map card ── */
+.map-card { border: 1px solid var(--glass-b); border-radius: 4px; overflow: hidden; position: relative; height: 360px; animation: fadeUp 0.65s 0.65s ease both; transition: border-color 0.28s; }
+.map-card:hover { border-color: rgba(74,144,217,0.5); }
+.map-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg,transparent,var(--sky),transparent); opacity: 0; transition: opacity 0.28s; z-index: 5; }
+.map-card:hover::before { opacity: 1; }
+.map-label { position: absolute; top: 0; left: 0; right: 0; z-index: 10; padding: 0.42rem 0.9rem; background: rgba(8,18,40,0.75); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(74,144,217,0.15); display: flex; align-items: center; justify-content: space-between; }
+.map-label-text { font-size: 0.52rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--foam); opacity: 0.62; }
+.map-coords-text { font-size: 0.48rem; letter-spacing: 0.1em; color: var(--steel); opacity: 0.8; }
+.map-click-hint { font-size: 0.44rem; letter-spacing: 0.08em; color: var(--foam); opacity: 0.35; margin-left: 0.6rem; }
+#map { position: absolute; inset: 0; cursor: crosshair; }
+
+/* Pier marker */
+.pier-marker { width: 14px; height: 14px; background: var(--amber); border: 2.5px solid var(--white); border-radius: 50%; box-shadow: 0 0 0 0 rgba(232,160,48,0.7); animation: pmPulse 2.2s ease-out infinite; }
+@keyframes pmPulse { 0%{box-shadow:0 0 0 0 rgba(232,160,48,0.7)} 70%{box-shadow:0 0 0 14px rgba(232,160,48,0)} 100%{box-shadow:0 0 0 0 rgba(232,160,48,0)} }
+
+/* Wind icon — 64px circle (reverted from 80) + info box below */
+.wind-icon { position: relative; pointer-events: none; }
+.wind-icon svg { display: block; overflow: visible; }
+.wind-info-box {
+  margin-top: 7px; background: rgba(8,18,40,0.94);
+  border: 1px solid rgba(74,144,217,0.45); border-radius: 5px;
+  padding: 7px 12px 8px; white-space: nowrap; width: 130px;
+  margin-left: -33px; /* centers 130px box under 64px circle: (130-64)/2=33 */
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+}
+.wind-info-row { font-family: 'Space Mono', monospace; font-size: 10.5px; letter-spacing: 0.05em; color: #a8d8f0; line-height: 1.65; display: flex; align-items: center; gap: 5px; }
+.wind-info-row .wir-label { font-size: 8px; opacity: 0.5; letter-spacing: 0.14em; text-transform: uppercase; flex-shrink: 0; width: 32px; }
+.wind-info-row .wir-val { color: #ffffff; font-size: 12px; font-weight: bold; letter-spacing: 0.02em; }
+.wind-info-row .wir-sub { font-size: 9px; opacity: 0.6; }
+.wind-info-divider { border: none; border-top: 1px solid rgba(74,144,217,0.18); margin: 5px 0; }
+
+/* ── Refresh ── */
+.refresh-btn { display: block; margin: 0.3rem auto 0; padding: 0.62rem 2rem; background: transparent; border: 1px solid rgba(74,144,217,0.35); color: var(--sky); font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; border-radius: 3px; transition: background 0.2s, border-color 0.2s, color 0.2s; animation: fadeUp 0.65s 0.75s ease both; }
+.refresh-btn:hover { background: rgba(74,144,217,0.14); border-color: var(--sky); color: var(--white); }
+
+footer { text-align: center; font-size: 0.48rem; letter-spacing: 0.1em; color: var(--steel); opacity: 0.55; animation: fadeUp 0.65s 0.85s ease both; line-height: 2; }
+footer a { color: var(--steel); }
+
+.skeleton { display: inline-block; background: linear-gradient(90deg,rgba(74,144,217,0.1) 25%,rgba(74,144,217,0.22) 50%,rgba(74,144,217,0.1) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 3px; color: transparent !important; min-width: 55px; }
+
+.leaflet-control-attribution { background: rgba(8,18,40,0.75)!important; color: rgba(168,216,240,0.38)!important; font-size: 9px!important; }
+.leaflet-control-attribution a { color: rgba(74,144,217,0.55)!important; }
+.leaflet-control-zoom a { background: rgba(13,32,69,0.85)!important; color: var(--foam)!important; border-color: rgba(74,144,217,0.2)!important; }
+
+@keyframes shimmer  { from{background-position:200% 0} to{background-position:-200% 0} }
+@keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.45} }
+@keyframes fadeDown { from{opacity:0;transform:translateY(-18px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeUp   { from{opacity:0;transform:translateY(18px)}  to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<div class="wave-bg">
+  <svg viewBox="0 0 1440 180" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0,70 C180,140 360,0 540,70 C720,140 900,0 1080,70 C1260,140 1440,0 1440,70 L1440,180 L0,180 Z" fill="rgba(74,144,217,1)"/>
+    <path d="M0,100 C180,50 360,150 540,100 C720,50 900,150 1080,100 C1260,50 1440,150 1440,100 L1440,180 L0,180 Z" fill="rgba(42,95,163,0.55)"/>
+  </svg>
+</div>
+
+<div class="container">
+
+  <header>
+    <div class="site-title">Coastal Conditions</div>
+    <div class="site-sub">Hampton Roads · Virginia</div>
+    <div id="locationName">Fort Monroe — Finger Pier</div>
+    <div class="coords" id="coordsDisplay">37.0011°N · 76.3043°W</div>
+    <div class="timestamp" id="ts">— Fetching data —</div>
+    <span class="unit-toggle" id="unitToggle">°F / °C</span>
+  </header>
+
+  <!-- Search bar -->
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" id="searchInput" type="text"
+           placeholder="Search location or enter coordinates (lat, lon)…"
+           autocomplete="off" spellcheck="false"/>
+    <div class="search-dropdown" id="searchDropdown"></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot loading" id="statusDot"></div>
+    <div class="status-text" id="statusText">Connecting to weather services…</div>
+  </div>
+
+  <!-- Data cards -->
+  <div class="cards">
+
+    <div class="card">
+      <div class="card-label">Air Temperature</div>
+      <div class="card-value"><span id="tempVal" class="skeleton">–––</span><span class="card-unit" id="tempUnit">°F</span></div>
+      <div class="card-sub" id="tempSub">feels like ···</div>
+    </div>
+
+    <div class="card water-card">
+      <div class="card-label">Water Temperature</div>
+      <div class="card-value"><span id="waterVal" class="skeleton">–––</span><span class="card-unit" id="waterUnit">°F</span></div>
+      <div class="card-sub" id="waterSub">sea surface ···</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Wind Speed</div>
+      <div class="card-value"><span id="windVal" class="skeleton">–––</span><span class="card-unit">mph</span></div>
+      <div class="bft-bar" id="bftBar">
+        <div class="bft-seg"></div><div class="bft-seg"></div><div class="bft-seg"></div>
+        <div class="bft-seg"></div><div class="bft-seg"></div><div class="bft-seg"></div>
+        <div class="bft-seg"></div><div class="bft-seg"></div><div class="bft-seg"></div>
+        <div class="bft-seg"></div><div class="bft-seg"></div><div class="bft-seg"></div>
+      </div>
+      <div class="card-sub" id="windSub">Beaufort ···</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Wind Direction</div>
+      <div class="card-value"><span id="dirVal" class="skeleton">–––</span><span class="card-unit">°</span></div>
+      <div class="compass-wrap">
+        <svg class="compass" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="25" cy="25" r="23" class="compass-ring"/>
+          <circle cx="25" cy="25" r="2" fill="rgba(74,144,217,0.28)"/>
+          <line x1="25" y1="3"  x2="25" y2="8"  stroke="rgba(168,216,240,0.45)" stroke-width="1.5"/>
+          <line x1="25" y1="42" x2="25" y2="47" stroke="rgba(168,216,240,0.2)"  stroke-width="1"/>
+          <line x1="3"  y1="25" x2="8"  y2="25" stroke="rgba(168,216,240,0.2)"  stroke-width="1"/>
+          <line x1="42" y1="25" x2="47" y2="25" stroke="rgba(168,216,240,0.2)"  stroke-width="1"/>
+          <text x="25" y="2.5" fill="rgba(168,216,240,0.5)" font-size="7" font-family="Space Mono" text-anchor="middle" dominant-baseline="hanging">N</text>
+          <polygon id="compassArrow" class="compass-arrow" points="25,6 28,23 25,20 22,23"/>
+        </svg>
+        <div class="card-sub" id="dirSub">from ···</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Wave Height</div>
+      <div class="card-value"><span id="waveVal" class="skeleton">–––</span><span class="card-unit">ft</span></div>
+      <div class="card-sub" id="waveSub">period · direction ···</div>
+    </div>
+
+    <!-- Tide card removed from grid — now full-width below -->
+
+  </div><!-- end .cards -->
+
+  <!-- ── Full-width Tide Card ── -->
+  <div class="tide-card-full">
+    <div class="card-label" style="margin-bottom:1rem;">Tidal Conditions <span style="opacity:0.4;font-size:0.46rem;margin-left:0.5rem;" id="tideStation">· nearest NOAA station</span></div>
+
+    <div class="tide-top">
+      <!-- Left: current reading -->
+      <div class="tide-top-left">
+        <div class="tide-status-row">
+          <span class="tide-direction-badge" id="tideBadge">···</span>
+          <span style="font-size:0.52rem;color:var(--foam);opacity:0.6" id="tidePhase">calculating…</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:4px;">
+          <span class="tide-current-ft" id="tideCurrentFt">–.–</span>
+          <span class="tide-current-unit">ft MSL</span>
+        </div>
+        <div class="tide-bar-wrap" style="width:200px;">
+          <div class="tide-bar-track">
+            <div class="tide-bar-fill" id="tideBarFill" style="width:50%"></div>
+            <div class="tide-bar-thumb" id="tideBarThumb" style="left:50%"></div>
+          </div>
+          <div class="tide-bar-labels">
+            <span id="tideLowLabel">Low</span>
+            <span id="tideHighLabel">High</span>
+          </div>
+        </div>
+      </div>
+      <!-- Right: tide events 2-col grid -->
+      <div class="tide-top-right">
+        <div class="tide-events-grid" id="tideEvents">
+          <div class="tide-event-row"><span style="font-size:0.52rem;opacity:0.5">Loading…</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 48-hour tide chart -->
+    <div class="tide-chart-wrap">
+      <div class="tide-chart-label">
+        <span>48-Hour Tide Curve · <span id="chartStationLabel">NOAA</span></span>
+        <span id="chartTimeLabel" style="color:var(--amber);opacity:0.8"></span>
+      </div>
+      <svg id="tideChartSvg" viewBox="0 0 800 110" preserveAspectRatio="none"></svg>
+      <div style="font-size:0.44rem;color:var(--foam);opacity:0.32;margin-top:3px;text-align:center;letter-spacing:0.1em;">← DRAG CHART TO SCRUB TIME →</div>
+    </div>
+  </div>
+
+  <!-- ── Time Navigator ── -->
+  <div class="time-nav">
+    <div class="time-nav-label">
+      <span>⏱ Time Navigator — Scrub Past &amp; Future Conditions</span>
+      <span class="time-nav-current" id="timeNavDisplay">Now</span>
+    </div>
+    <div class="time-nav-row">
+      <button class="time-nav-btn" onclick="stepTime(-1)">◀ 1h</button>
+      <span class="time-offset-badge" id="timeOffsetBadge">NOW</span>
+      <div class="custom-slider-wrap" id="timeSliderWrap">
+        <div class="custom-slider-track">
+          <div class="custom-slider-fill" id="timeSliderFill"></div>
+          <div class="custom-slider-thumb" id="timeSliderThumb"></div>
+        </div>
+      </div>
+      <button class="time-nav-btn" onclick="stepTime(1)">1h ▶</button>
+    </div>
+    <div class="time-nav-presets">
+      <button class="time-preset-btn" onclick="setTimeOffset(-168)">−7d</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(-72)">−3d</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(-24)">−24h</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(-6)">−6h</button>
+      <button class="time-preset-btn active" onclick="setTimeOffset(0)">Now</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(6)">+6h</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(24)">+24h</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(72)">+3d</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(168)">+7d</button>
+    </div>
+
+    <!-- Hourly forecast scroll -->
+    <div class="forecast-panel">
+      <div class="forecast-label">Hourly Conditions — Scroll to explore ±24 hours</div>
+      <div class="forecast-scroll" id="forecastScroll"></div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-card">
+    <div class="map-label">
+      <span class="map-label-text" id="mapLabelText">📍 Fort Monroe — Finger Pier</span>
+      <span>
+        <span class="map-coords-text" id="mapCoordsText">37.0011°N · 76.3043°W</span>
+        <span class="map-click-hint">· click map to change location</span>
+      </span>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <button class="refresh-btn" onclick="fetchAll()">⟳ &nbsp;Refresh Data</button>
+
+  <footer>
+    Weather &amp; Marine: <a href="https://open-meteo.com" target="_blank">Open-Meteo</a>
+    &nbsp;·&nbsp; Tides: <a href="https://api.tidesandcurrents.noaa.gov" target="_blank">NOAA Tides &amp; Currents</a>
+    &nbsp;·&nbsp; Map: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> / <a href="https://carto.com" target="_blank">CARTO</a>
+    <br>© Bao Nguyen · Auto-refreshes every minute
+  </footer>
+
+</div>
+
+<script>
+// ─── Location presets ─────────────────────────────────────────────────────────
+const PIERS = [
+  { name: 'Fort Monroe — Finger Pier', lat: 37.001139,  lon: -76.304278, icon: '⚓' },
+  { name: 'The Green Mile Pier',       lat: 36.963922,  lon: -76.409387, icon: '🎣' },
+  { name: 'Buckroe Fishing Pier',      lat: 37.036044,  lon: -76.289611, icon: '🎣' },
+  { name: 'Ocean View Fishing Pier',   lat: 36.963966,  lon: -76.257437, icon: '🎣' },
+  { name: 'Sandbridge Fishing Pier',   lat: 36.694392,  lon: -75.921887, icon: '🎣' },
+  { name: 'HRBT',                      lat: 37.007718,  lon: -76.321626, icon: '🌉' },
+  { name: 'VA Hospital',               lat: 37.014973,  lon: -76.339010, icon: '🏥' },
+  { name: 'Mill Creek',                lat: 37.013300,  lon: -76.317445, icon: '🌊' },
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let currentLat = PIERS[0].lat, currentLon = PIERS[0].lon, currentName = PIERS[0].name;
+let useFahrenheit = true;
+let lastTempC = null, lastFeelsC = null, lastWaterC = null;
+let lastWindMph = 0, lastWindDir = 0;
+let leafletMap = null, pierMarker = null, windIconMarker = null;
+let timeOffsetHours = 0;               // navigator offset
+let wxHourlyData = null;               // cache hourly forecast
+let tidePredictions = [];              // cache tide hi/lo predictions
+let tideCurveData = [];                // cache 6-min water levels for chart
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const DIR_LABELS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const BFT_MPH    = [0,1,4,8,13,19,25,32,39,47,55,64,74];
+const BFT_DESC   = ['Calm','Light air','Light breeze','Gentle breeze','Moderate breeze','Fresh breeze','Strong breeze','Near gale','Gale','Strong gale','Storm','Violent storm','Hurricane'];
+
+const degToCard = d => DIR_LABELS[Math.round(d/22.5)%16];
+const beaufort  = mph => { for(let i=BFT_MPH.length-1;i>=0;i--) if(mph>=BFT_MPH[i]) return i; return 0; };
+const cToF      = c => (c*9/5+32).toFixed(1);
+const mToFt     = m => (m*3.28084).toFixed(1);
+const fmtCoord  = (lat,lon) => `${Math.abs(lat).toFixed(4)}°${lat>=0?'N':'S'} · ${Math.abs(lon).toFixed(4)}°${lon>=0?'E':'W'}`;
+const pad       = n => String(n).padStart(2,'0');
+const fmtDate   = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+const fmtTime   = d => d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+
+// ─── Map icon ─────────────────────────────────────────────────────────────────
+function buildMapIconHTML(speedMph, dirDeg, waterDisplay) {
+  const bft = beaufort(speedMph);
+  const ring = bft>=7?'#c0392b':bft>=4?'#e8a030':'#4a90d9';
+  const spdTxt = parseFloat(speedMph)<1?'Calm':`${parseFloat(speedMph).toFixed(0)} mph`;
+  const wtTxt = waterDisplay||'—';
+  return `<div class="wind-icon">
+    <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="32" cy="32" r="31" fill="none" stroke="${ring}" stroke-width="1" opacity="0.25"/>
+      <circle cx="32" cy="32" r="28" fill="rgba(8,18,40,0.88)" stroke="${ring}" stroke-width="2"/>
+      <g transform="rotate(${dirDeg},32,32)">
+        <line x1="32" y1="50" x2="32" y2="13" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        <polyline points="23,23 32,13 41,23" fill="none" stroke="white" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      </g>
+    </svg>
+    <div class="wind-info-box">
+      <div class="wind-info-row"><span class="wir-label">WIND</span><span class="wir-val">${spdTxt}</span><span class="wir-sub">${degToCard(dirDeg)}</span></div>
+      <hr class="wind-info-divider"/>
+      <div class="wind-info-row"><span class="wir-label">WATER</span><span class="wir-val">${wtTxt}</span></div>
+    </div>
+  </div>`;
+}
+
+// ─── Map init ─────────────────────────────────────────────────────────────────
+function initMap() {
+  leafletMap = L.map('map',{center:[currentLat,currentLon],zoom:14,zoomControl:true,scrollWheelZoom:false});
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+    attribution:'Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics',
+    maxZoom:19
+  }).addTo(leafletMap);
+
+  const pierIcon = L.divIcon({className:'',html:'<div class="pier-marker"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+  pierMarker = L.marker([currentLat,currentLon],{icon:pierIcon,zIndexOffset:100})
+    .addTo(leafletMap)
+    .bindPopup(`<div style="font-family:Space Mono,monospace;font-size:11px;color:#0a1628;line-height:1.6"><strong>${currentName}</strong><br>${fmtCoord(currentLat,currentLon)}</div>`,{offset:[0,-8]});
+
+  windIconMarker = L.marker([currentLat,currentLon],{
+    icon:L.divIcon({className:'',html:buildMapIconHTML(0,0,'—'),iconSize:[64,64],iconAnchor:[32,32]}),
+    zIndexOffset:500,interactive:false
+  }).addTo(leafletMap);
+
+  leafletMap.on('click',e=>{
+    const lat=parseFloat(e.latlng.lat.toFixed(6)), lon=parseFloat(e.latlng.lng.toFixed(6));
+    selectLocation(lat,lon,'Custom Location');
+  });
+}
+
+function moveMapTo(lat,lon,name) {
+  if(!leafletMap) return;
+  leafletMap.setView([lat,lon],14,{animate:true});
+  pierMarker.setLatLng([lat,lon]);
+  pierMarker.setPopupContent(`<div style="font-family:Space Mono,monospace;font-size:11px;color:#0a1628;line-height:1.6"><strong>${name}</strong><br>${fmtCoord(lat,lon)}</div>`);
+  windIconMarker.setLatLng([lat,lon]);
+  document.getElementById('mapLabelText').textContent=`📍 ${name}`;
+  document.getElementById('mapCoordsText').textContent=fmtCoord(lat,lon);
+}
+
+function updateMapIcon() {
+  if(!windIconMarker) return;
+  const waterDisp = lastWaterC!==null?(useFahrenheit?`${parseFloat(cToF(lastWaterC)).toFixed(0)}°F`:`${parseFloat(lastWaterC).toFixed(0)}°C`):'—';
+  windIconMarker.setIcon(L.divIcon({className:'',html:buildMapIconHTML(lastWindMph,lastWindDir,waterDisp),iconSize:[64,64],iconAnchor:[32,32]}));
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+function buildDropdown(filter='') {
+  const dd=document.getElementById('searchDropdown');
+  const f=filter.toLowerCase().trim();
+  const items=PIERS.filter(p=>!f||p.name.toLowerCase().includes(f));
+  if(!items.length){dd.innerHTML='<div class="dropdown-header">No matching locations</div>';return;}
+  dd.innerHTML='<div class="dropdown-header">Locations</div>'+items.map(p=>`
+    <div class="dropdown-item" onclick="selectLocation(${p.lat},${p.lon},'${p.name.replace(/'/g,"\\'")}')">
+      <span class="di-icon">${p.icon}</span>
+      <span><div class="di-name">${p.name}</div><div class="di-coords">${fmtCoord(p.lat,p.lon)}</div></span>
+    </div>`).join('');
+}
+const openDropdown=()=>{buildDropdown(document.getElementById('searchInput').value);document.getElementById('searchDropdown').classList.add('open');};
+const closeDropdown=()=>document.getElementById('searchDropdown').classList.remove('open');
+
+function selectLocation(lat,lon,name) {
+  currentLat=lat;currentLon=lon;currentName=name;
+  document.getElementById('searchInput').value='';
+  closeDropdown();
+  document.getElementById('locationName').textContent=name;
+  document.getElementById('coordsDisplay').textContent=fmtCoord(lat,lon);
+  moveMapTo(lat,lon,name);
+  CHART.realNow = null; // re-anchor chart to new fetch time
+  setTimeOffset(0);
+  fetchAll();
+}
+document.getElementById('searchInput').addEventListener('focus',openDropdown);
+document.getElementById('searchInput').addEventListener('input',()=>{buildDropdown(document.getElementById('searchInput').value);document.getElementById('searchDropdown').classList.add('open');});
+document.getElementById('searchInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    const val=document.getElementById('searchInput').value.trim();
+    const parts=val.replace(/[°'"]/g,'').split(/[\s,]+/);
+    if(parts.length>=2){const lat=parseFloat(parts[0]),lon=parseFloat(parts[1]);if(!isNaN(lat)&&!isNaN(lon)&&lat>=-90&&lat<=90)selectLocation(lat,lon,'Custom Location');}
+  }
+  if(e.key==='Escape')closeDropdown();
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))closeDropdown();});
+
+// ─── Status / skeleton ────────────────────────────────────────────────────────
+function setStatus(s,m){document.getElementById('statusDot').className='status-dot '+s;document.getElementById('statusText').textContent=m;}
+function setSkeleton(on){['tempVal','waterVal','windVal','dirVal','waveVal'].forEach(id=>document.getElementById(id).classList.toggle('skeleton',on));}
+
+// ─── Render temps ─────────────────────────────────────────────────────────────
+function renderTemps() {
+  if(lastTempC!==null){
+    document.getElementById('tempVal').textContent=useFahrenheit?cToF(lastTempC):parseFloat(lastTempC).toFixed(1);
+    document.getElementById('tempUnit').textContent=useFahrenheit?'°F':'°C';
+    document.getElementById('tempSub').textContent=lastFeelsC!==null?`feels like ${useFahrenheit?cToF(lastFeelsC):parseFloat(lastFeelsC).toFixed(1)} ${useFahrenheit?'°F':'°C'}`:'';
+  }
+  if(lastWaterC!==null){
+    document.getElementById('waterVal').textContent=useFahrenheit?cToF(lastWaterC):parseFloat(lastWaterC).toFixed(1);
+    document.getElementById('waterUnit').textContent=useFahrenheit?'°F':'°C';
+    updateMapIcon();
+  }
+}
+document.getElementById('unitToggle').addEventListener('click',()=>{useFahrenheit=!useFahrenheit;renderTemps();renderForecastScroll();});
+
+// ─── NOAA Tide Stations ───────────────────────────────────────────────────────
+const NOAA_STATIONS=[
+  {id:'8638863',name:'CBBT',              lat:36.972,lon:-76.113},
+  {id:'8638610',name:'Sewells Point',     lat:36.947,lon:-76.330},
+  {id:'8637689',name:'Yorktown',          lat:37.227,lon:-76.479},
+  {id:'8638901',name:'Virginia Beach',   lat:36.844,lon:-75.978},
+  {id:'8636580',name:'Cape Henry',        lat:36.926,lon:-76.015},
+];
+function nearestStation(lat,lon){let b=NOAA_STATIONS[0],bd=Infinity;NOAA_STATIONS.forEach(s=>{const d=Math.hypot(s.lat-lat,s.lon-lon);if(d<bd){bd=d;b=s;}});return b;}
+
+async function fetchTides(lat,lon) {
+  const station = nearestStation(lat,lon);
+  const now     = new Date();
+
+  // 7 days back and 7 days forward
+  const past7   = new Date(now); past7.setDate(past7.getDate() - 7);
+  const future7 = new Date(now); future7.setDate(future7.getDate() + 7);
+
+  // Hi/Lo events: full 14-day window for event list
+  const hiloUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=hilo&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(past7)}&end_date=${fmtDate(future7)}`;
+
+  // 6-min predictions for the full 14-day curve (consistent scale, no seam)
+  const predUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=6&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(past7)}&end_date=${fmtDate(future7)}`;
+
+  // Current observed water level (today only — just for the "ft MSL" readout)
+  const levelUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=water_level&datum=MLLW&time_zone=lst_ldt&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(now)}&end_date=${fmtDate(now)}`;
+
+  // Water temperature from NOAA (returns °F, today only)
+  const wtempUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=water_temperature&time_zone=lst_ldt&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(now)}&end_date=${fmtDate(now)}`;
+
+  const [hiloRes, predRes, levelRes, wtempRes] = await Promise.all([
+    fetch(hiloUrl).then(r=>r.json()),
+    fetch(predUrl).then(r=>r.json()),
+    fetch(levelUrl).then(r=>r.json()),
+    fetch(wtempUrl).then(r=>r.json()).catch(()=>null),
+  ]);
+  return { hiloRes, predRes, levelRes, wtempRes, station };
+}
+
+// ─── Draw 48-hour tide SVG chart ──────────────────────────────────────────────
+// ─── Tide chart: sliding viewport ─────────────────────────────────────────────
+// The full curve is rendered at a fixed px/hour scale into a virtual canvas.
+// Scrubbing translates the entire <g> so the amber line (fixed at x=400) always
+// points at the viewed time. Curve proportions never change.
+const CHART = { PX_PER_HOUR: 20, H: 110, PAD: 8, realNow: null };
+
+function renderTideChart(atTime) {
+  if (!tideCurveData.length) return;
+
+  // Lock realNow once per data load — reset on new location fetch
+  if (!CHART.realNow) CHART.realNow = new Date();
+  const realNow = CHART.realNow;
+  const { PX_PER_HOUR, H, PAD } = CHART;
+
+  const sorted = [...tideCurveData].sort((a, b) => a.time - b.time);
+  if (!sorted.length) return;
+
+  const dataStart = sorted[0].time;
+  const dataEnd   = sorted[sorted.length - 1].time;
+
+  // Virtual x: time → pixel in the infinite canvas
+  const tx = t => ((t - dataStart) / 3600000) * PX_PER_HOUR;
+
+  // SVG is 800px wide. Amber line fixed at x=400 (centre).
+  // Translate the whole curve group so atTime lands at x=400.
+  const translateX = 400 - tx(atTime);
+
+  // Y scale locked to full dataset range — never changes
+  const minFt = Math.min(...sorted.map(p => p.ft)) - 0.1;
+  const maxFt = Math.max(...sorted.map(p => p.ft)) + 0.1;
+  const range  = maxFt - minFt || 1;
+  const ty = ft => H - PAD - ((ft - minFt) / range) * (H - PAD * 2);
+
+  // Build full curve path in virtual coords
+  let d = `M${tx(sorted[0].time)},${ty(sorted[0].ft)}`;
+  for (let i = 1; i < sorted.length; i++) {
+    const x0 = tx(sorted[i-1].time), y0 = ty(sorted[i-1].ft);
+    const x1 = tx(sorted[i].time),   y1 = ty(sorted[i].ft);
+    const cx  = (x0 + x1) / 2;
+    d += ` C${cx},${y0} ${cx},${y1} ${x1},${y1}`;
+  }
+  const fillD = d + ` L${tx(dataEnd)},${H} L${tx(dataStart)},${H} Z`;
+
+  // Real-now virtual x — slides with the curve group
+  const realNowVX = tx(realNow);
+
+  // Past dim rect: from left edge of viewport (in virtual coords) to realNow
+  const leftEdgeVirtual = -translateX;            // left viewport edge in virtual coords
+  const pastRectW = realNowVX - leftEdgeVirtual;
+
+  // Hi/Lo markers (in virtual coords — slide with curve)
+  const markers = tidePredictions.map(ev => {
+    const x = tx(ev.time);
+    const y = ty(ev.ft);
+    const col = ev.type === 'H' ? '#80e8a0' : '#ff9080';
+    const labelY = ev.type === 'H' ? y - 9 : y + 14;
+    return `<circle cx="${x}" cy="${y}" r="4" fill="${col}" opacity="0.9"/>
+            <text x="${x}" y="${labelY}" text-anchor="middle" font-size="8"
+              fill="${col}" font-family="Space Mono" opacity="0.9">${ev.ft.toFixed(1)}ft</text>`;
+  }).join('');
+
+  const hOff = timeOffsetHours === 0 ? 'Now'
+    : timeOffsetHours > 0 ? `+${timeOffsetHours}h` : `${timeOffsetHours}h`;
+  const chartLabelEl = document.getElementById('chartTimeLabel');
+  if (chartLabelEl) chartLabelEl.textContent = `Viewing: ${hOff}`;
+
+  const svg = document.getElementById('tideChartSvg');
+  if (!svg) return;
+
+  svg.innerHTML = `
+    <defs>
+      <clipPath id="cc"><rect x="0" y="0" width="800" height="${H}"/></clipPath>
+      <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6a5acd" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#6a5acd" stop-opacity="0.02"/>
+      </linearGradient>
+      <linearGradient id="fadeL" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#0d2045" stop-opacity="0.95"/>
+        <stop offset="100%" stop-color="#0d2045" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="fadeR" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#0d2045" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#0d2045" stop-opacity="0.95"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Clipped sliding group -->
+    <g clip-path="url(#cc)">
+      <g transform="translate(${translateX},0)">
+        <path d="${fillD}" fill="url(#tg)"/>
+        <path d="${d}" fill="none" stroke="#a090ff" stroke-width="2" stroke-linecap="round"/>
+        <!-- Past dim overlay anchored to real-now in virtual space -->
+        ${pastRectW > 0
+          ? `<rect x="${leftEdgeVirtual}" y="0" width="${pastRectW}" height="${H}" fill="rgba(8,18,40,0.42)"/>`
+          : ''}
+        <!-- Zero sea-level line -->
+        <line x1="${tx(dataStart)}" y1="${ty(0)}"
+              x2="${tx(dataEnd)}"   y2="${ty(0)}"
+              stroke="rgba(168,216,240,0.12)" stroke-width="1" stroke-dasharray="4,4"/>
+        <!-- Hi/Lo markers -->
+        ${markers}
+        <!-- Real-now tick — slides with curve, dimmer than amber cursor -->
+        <line x1="${realNowVX}" y1="0" x2="${realNowVX}" y2="${H}"
+              stroke="rgba(232,160,48,0.35)" stroke-width="1" stroke-dasharray="3,3"/>
+      </g>
+    </g>
+
+    <!-- Amber cursor — fixed at x=400, always marks viewed time -->
+    <line x1="400" y1="0" x2="400" y2="${H}"
+          stroke="#e8a030" stroke-width="2" stroke-dasharray="5,3"/>
+    <rect x="396" y="0" width="8" height="8" fill="#e8a030" rx="1"/>
+    <text x="408" y="10" font-size="8" fill="#e8a030" font-family="Space Mono"
+          opacity="0.95">${hOff}</text>
+
+    <!-- Edge fade overlays so curve slides cleanly in/out -->
+    <rect x="0"   y="0" width="36" height="${H}" fill="url(#fadeL)"/>
+    <rect x="764" y="0" width="36" height="${H}" fill="url(#fadeR)"/>
+  `;
+}
+function renderTides(hiloRes, predRes, levelRes, station) {
+  // Hi/Lo events for the info panel
+  tidePredictions = (hiloRes.predictions||[]).map(p => ({
+    time: new Date(p.t.replace(' ','T')), type: p.type, ft: parseFloat(p.v)
+  }));
+
+  // Curve: use NOAA 6-min predictions for the ENTIRE range — no seam, no mismatch
+  tideCurveData = (predRes.predictions||[]).map(p => ({
+    time: new Date(p.t.replace(' ','T')), ft: parseFloat(p.v)
+  }));
+
+  // Current observed water level — most recent reading for the "ft MSL" display
+  let currentFt = null;
+  if (levelRes.data && levelRes.data.length) {
+    currentFt = parseFloat(levelRes.data[levelRes.data.length - 1].v);
+  }
+  // Fall back to interpolated prediction if observation unavailable
+  if (currentFt === null && tideCurveData.length) {
+    const now = new Date();
+    const sorted = [...tideCurveData].sort((a,b) => a.time - b.time);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (now >= sorted[i].time && now <= sorted[i+1].time) {
+        const frac = (now - sorted[i].time) / (sorted[i+1].time - sorted[i].time);
+        currentFt = sorted[i].ft + frac * (sorted[i+1].ft - sorted[i].ft);
+        break;
+      }
+    }
+  }
+
+  document.getElementById('tideStation').textContent = `· ${station.name}`;
+  document.getElementById('chartStationLabel').textContent = station.name;
+  CHART.realNow = null; // reset so chart anchors to fresh fetch time
+
+  const now = new Date();
+  renderTideDisplay(currentFt, now);
+  renderTideChart(now);
+}
+
+function renderTideDisplay(currentFt, atTime) {
+  // Surrounding hi/lo events
+  const future=tidePredictions.filter(p=>p.time>atTime);
+  const past=tidePredictions.filter(p=>p.time<=atTime);
+  const prev=past.length?past[past.length-1]:null;
+  const next=future.length?future[0]:null;
+
+  let direction='···', badgeClass='';
+  if(prev&&next){
+    if(next.type==='H'){direction='Incoming ↑';badgeClass='incoming';}
+    else{direction='Outgoing ↓';badgeClass='outgoing';}
+  }
+  document.getElementById('tideBadge').textContent=direction;
+  document.getElementById('tideBadge').className='tide-direction-badge '+badgeClass;
+
+  if(currentFt!==null){
+    document.getElementById('tideCurrentFt').textContent=currentFt.toFixed(1);
+    document.getElementById('tidePhase').textContent=currentFt>=0?`${currentFt.toFixed(2)} ft above sea level`:`${Math.abs(currentFt).toFixed(2)} ft below sea level`;
+  } else {
+    document.getElementById('tideCurrentFt').textContent='—';
+    document.getElementById('tidePhase').textContent='Level unavailable';
+  }
+
+  // Progress bar
+  if(prev&&next&&currentFt!==null){
+    const lo=Math.min(prev.ft,next.ft),hi=Math.max(prev.ft,next.ft),range=hi-lo||1;
+    const pct=Math.min(100,Math.max(0,((currentFt-lo)/range)*100));
+    document.getElementById('tideBarFill').style.width=pct+'%';
+    document.getElementById('tideBarThumb').style.left=pct+'%';
+    document.getElementById('tideLowLabel').textContent=`Low ${lo.toFixed(1)}ft`;
+    document.getElementById('tideHighLabel').textContent=`High ${hi.toFixed(1)}ft`;
+  }
+
+  // Events grid: last 2 past + next 4 future
+  const events=[];
+  if(past.length>=2) events.push({...past[past.length-2],label:'Prev',past:true});
+  if(prev) events.push({...prev,label:'Last',past:true});
+  future.slice(0,4).forEach((ev,i)=>events.push({...ev,label:i===0?'Next':i===1?'Then':'Later',past:false}));
+
+  const fmtDay=d=>{
+    const today=new Date(),tom=new Date();tom.setDate(tom.getDate()+1);
+    const yest=new Date();yest.setDate(yest.getDate()-1);
+    if(d.toDateString()===today.toDateString()) return fmtTime(d);
+    if(d.toDateString()===tom.toDateString())   return 'Tmrw '+fmtTime(d);
+    if(d.toDateString()===yest.toDateString())  return 'Yest '+fmtTime(d);
+    return fmtTime(d);
+  };
+
+  document.getElementById('tideEvents').innerHTML=events.length?events.map(ev=>`
+    <div class="tide-event-row" style="${ev.past?'opacity:0.6':''}">
+      <span class="tide-event-icon">${ev.type==='H'?(ev.past?'⬆':'🔼'):(ev.past?'⬇':'🔽')}</span>
+      <span class="tide-event-label">${ev.label} ${ev.type==='H'?'High':'Low'}</span>
+      <span class="tide-event-time">${fmtDay(ev.time)}</span>
+      <span class="tide-event-ht">${ev.ft>=0?'+':''}${ev.ft.toFixed(2)} ft</span>
+    </div>`).join(''):'<div class="tide-event-row"><span style="font-size:0.52rem;opacity:0.5">No data</span></div>';
+}
+
+// ─── Time Navigator ───────────────────────────────────────────────────────────
+function stepTime(delta) {
+  setTimeOffset(timeOffsetHours+delta);
+}
+
+function setTimeOffset(h) {
+  timeOffsetHours = Math.max(-168, Math.min(168, h));
+
+  updateSliderVisual(timeOffsetHours);
+
+  const badge=timeOffsetHours===0?'NOW':timeOffsetHours>0?`+${timeOffsetHours}H`:`${timeOffsetHours}H`;
+  document.getElementById('timeOffsetBadge').textContent=badge;
+  const atTime=new Date(Date.now()+timeOffsetHours*3600000);
+  document.getElementById('timeNavDisplay').textContent=timeOffsetHours===0?'Now':atTime.toLocaleTimeString('en-US',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+
+  document.querySelectorAll('.time-preset-btn').forEach(btn=>{
+    const m=btn.getAttribute('onclick').match(/-?\d+/);
+    if(m) btn.classList.toggle('active',parseInt(m[0])===timeOffsetHours);
+  });
+
+  renderWeatherAtOffset();
+  renderTideChart(atTime);
+  renderTideDisplayAtOffset(atTime);
+  renderForecastScroll();
+
+  // Scroll the selected chip into view inside the strip only — not the page
+  setTimeout(() => {
+    const strip = document.getElementById('forecastScroll');
+    const chip  = document.getElementById(`chip-${timeOffsetHours}`);
+    if (strip && chip) {
+      const sr = strip.getBoundingClientRect();
+      const cr = chip.getBoundingClientRect();
+      strip.scrollLeft += cr.left - sr.left - (sr.width - cr.width) / 2;
+    }
+  }, 30);
+}
+
+// ─── Lock page scroll during any drag ────────────────────────────────────────
+function lockScroll()   { document.body.style.overflow = 'hidden'; }
+function unlockScroll() { document.body.style.overflow = ''; }
+
+// ─── Slider visual — standalone global so any code path can call it ──────────
+function updateSliderVisual(h) {
+  const thumb = document.getElementById('timeSliderThumb');
+  const fill  = document.getElementById('timeSliderFill');
+  if (!thumb || !fill) return;
+  const pct = ((h + 168) / 336) * 100;          // 0–100% over ±168h range
+  thumb.style.left = pct + '%';
+  const center = 50;
+  if (pct >= center) {
+    fill.style.left  = center + '%';
+    fill.style.width = (pct - center) + '%';
+  } else {
+    fill.style.left  = pct + '%';
+    fill.style.width = (center - pct) + '%';
+  }
+}
+
+// ─── Custom time-navigator slider ─────────────────────────────────────────────
+function initTimeSlider() {
+  const wrap = document.getElementById('timeSliderWrap');
+  if (!wrap) return;
+
+  let active = false;
+
+  function pctFromEvent(e) {
+    const r = wrap.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  }
+  function offsetFromPct(p) { return Math.round(p * 336 - 168); }
+
+  wrap.addEventListener('pointerdown', e => {
+    active = true;
+    wrap.setPointerCapture(e.pointerId);
+    lockScroll();
+    setTimeOffset(offsetFromPct(pctFromEvent(e)));
+    e.preventDefault();
+  });
+
+  wrap.addEventListener('pointermove', e => {
+    if (!active) return;
+    setTimeOffset(offsetFromPct(pctFromEvent(e)));
+    e.preventDefault();
+  });
+
+  wrap.addEventListener('pointerup',     () => { active = false; unlockScroll(); });
+  wrap.addEventListener('pointercancel', () => { active = false; unlockScroll(); });
+
+  updateSliderVisual(0);
+}
+
+function renderWeatherAtOffset() {
+  if(!wxHourlyData) return;
+  const hours=wxHourlyData.hourly;
+  const atTime=new Date(Date.now()+timeOffsetHours*3600000);
+  // Find closest hourly index
+  let bestIdx=0,bestDiff=Infinity;
+  hours.time.forEach((t,i)=>{
+    const d=Math.abs(new Date(t)-atTime);
+    if(d<bestDiff){bestDiff=d;bestIdx=i;}
+  });
+
+  if(timeOffsetHours===0){
+    // Current conditions already displayed; just restore
+    return;
+  }
+
+  const t2m=hours.temperature_2m[bestIdx];
+  const app=hours.apparent_temperature[bestIdx];
+  const ws=hours.wind_speed_10m[bestIdx];
+  const wg=hours.wind_gusts_10m[bestIdx];
+  const wd=hours.wind_direction_10m[bestIdx];
+  const wh=hours.wave_height?hours.wave_height[bestIdx]:null;
+
+  // Temp
+  if(t2m!=null){
+    lastTempC=t2m; lastFeelsC=app;
+    renderTemps();
+  }
+  // Wind
+  if(ws!=null){
+    const bft=beaufort(ws);
+    document.getElementById('windVal').textContent=ws.toFixed(1);
+    document.getElementById('windSub').textContent=`Beaufort ${bft} · ${BFT_DESC[bft]} · gusts ${wg?wg.toFixed(1):'—'} mph`;
+    document.querySelectorAll('.bft-seg').forEach((seg,i)=>{seg.classList.remove('active','warn','danger');if(i<bft)seg.classList.add(bft>=10?'danger':bft>=7?'warn':'active');});
+    document.getElementById('dirVal').textContent=wd?wd.toFixed(0):'—';
+    document.getElementById('dirSub').textContent=wd?`from the ${degToCard(wd)} (${wd.toFixed(0)}°)`:'—';
+    document.getElementById('compassArrow').style.transform=`rotate(${wd||0}deg)`;
+    lastWindMph=ws;lastWindDir=wd||0;
+    updateMapIcon();
+  }
+  // Waves (from marine hourly if available)
+  if(wh!=null){
+    document.getElementById('waveVal').textContent=mToFt(wh);
+  }
+}
+
+function renderTideDisplayAtOffset(atTime) {
+  if(!tideCurveData.length) return;
+  // Interpolate water level at atTime from curve
+  const sorted=[...tideCurveData].sort((a,b)=>a.time-b.time);
+  let ft=null;
+  for(let i=0;i<sorted.length-1;i++){
+    if(atTime>=sorted[i].time&&atTime<=sorted[i+1].time){
+      const frac=(atTime-sorted[i].time)/(sorted[i+1].time-sorted[i].time);
+      ft=sorted[i].ft+frac*(sorted[i+1].ft-sorted[i].ft);
+      break;
+    }
+  }
+  renderTideDisplay(ft, atTime);
+}
+
+// ─── Hourly forecast scroll ────────────────────────────────────────────────────
+function renderForecastScroll(initialLoad = false) {
+  if(!wxHourlyData) return;
+  const hours=wxHourlyData.hourly;
+  const now=new Date();
+  const container=document.getElementById('forecastScroll');
+  const chips=[];
+  let nowChipIdx=0;
+
+  for(let i=0;i<hours.time.length;i++){
+    const t=new Date(hours.time[i]);
+    const diffH=Math.round((t-now)/3600000);
+    if(diffH<-168||diffH>168) continue;
+
+    const isSelected = diffH === timeOffsetHours;
+    const isNow = diffH === 0;
+    const t2m = hours.temperature_2m[i];
+    const ws  = hours.wind_speed_10m[i];
+    const wh  = hours.wave_height ? hours.wave_height[i] : null;
+    const tempDisp = t2m!=null ? (useFahrenheit ? `${parseFloat(cToF(t2m)).toFixed(0)}` : `${parseFloat(t2m).toFixed(0)}`) : '—';
+    const tempU    = useFahrenheit ? '°F' : '°C';
+    const timeLabel = diffH===0 ? 'Now' : diffH>0 ? `+${diffH}h` : `${diffH}h`;
+    const waveDisp  = wh!=null ? `${mToFt(wh)}ft` : '';
+
+    chips.push({diffH, html:`
+      <div class="forecast-chip${t<now?' is-past':''}${isNow?' is-now':''}${isSelected?' is-selected':''}"
+           id="chip-${diffH}" onclick="setTimeOffset(${diffH})">
+        <div class="fc-time">${timeLabel}<br>${t.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div>
+        <div class="fc-temp">${tempDisp}<span style="font-size:0.55rem;opacity:0.6">${tempU}</span></div>
+        <div class="fc-wind">${ws!=null?`${ws.toFixed(0)}mph ${degToCard(hours.wind_direction_10m[i]||0)}`:'—'}</div>
+        ${waveDisp?`<div class="fc-wave">~${waveDisp}</div>`:''}
+      </div>`
+    });
+    if(Math.abs(diffH)<=1&&!nowChipIdx) nowChipIdx=chips.length-1;
+  }
+
+  container.innerHTML = chips.map(c=>c.html).join('');
+
+  // Only auto-scroll to Now on the initial data load — not during time scrubbing
+  if (initialLoad) {
+    setTimeout(()=>{
+      const nowEl = container.querySelector('.is-now');
+      if (nowEl) {
+        const stripRect = container.getBoundingClientRect();
+        const chipRect  = nowEl.getBoundingClientRect();
+        container.scrollLeft += chipRect.left - stripRect.left - (stripRect.width - chipRect.width) / 2;
+      }
+    }, 50);
+  }
+}
+
+// ─── Main fetch ───────────────────────────────────────────────────────────────
+async function fetchAll() {
+  setSkeleton(true);
+  setStatus('loading',`Fetching conditions for ${currentName}…`);
+  document.getElementById('ts').textContent='— Updating —';
+  const lat=currentLat,lon=currentLon;
+
+  try {
+    const [wx, marine, tideData] = await Promise.all([
+      // Hourly: past 24h + next 24h
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=America%2FNew_York&past_days=7&forecast_days=7`).then(r=>r.json()),
+      fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_period,wave_direction,sea_surface_temperature&hourly=wave_height,wave_direction&timezone=America%2FNew_York&past_days=7&forecast_days=7`).then(r=>r.json()),
+      fetchTides(lat,lon)
+    ]);
+
+    const c=wx.current, mc=marine.current;
+
+    // Store hourly data (merge marine wave_height into wx hourly)
+    wxHourlyData=wx;
+    if(marine.hourly&&marine.hourly.wave_height) wxHourlyData.hourly.wave_height=marine.hourly.wave_height;
+
+    // Air temp
+    lastTempC=c.temperature_2m; lastFeelsC=c.apparent_temperature;
+    // Water temp — prefer NOAA observed (°F), convert to °C for storage; fall back to marine API (already °C)
+    const noaaWtemp = tideData.wtempRes && tideData.wtempRes.data && tideData.wtempRes.data.length
+      ? parseFloat(tideData.wtempRes.data[tideData.wtempRes.data.length - 1].v)
+      : null;
+    if (noaaWtemp !== null && !isNaN(noaaWtemp)) {
+      lastWaterC = (noaaWtemp - 32) * 5 / 9; // NOAA returns °F, store as °C
+      document.getElementById('waterSub').textContent = `NOAA · ${tideData.station.name}`;
+    } else if (mc && mc.sea_surface_temperature != null) {
+      lastWaterC = mc.sea_surface_temperature;
+      document.getElementById('waterSub').textContent = 'sea surface temperature';
+    } else {
+      lastWaterC = null;
+      document.getElementById('waterSub').textContent = 'No water temp data';
+      document.getElementById('waterVal').textContent = 'N/A';
+    }
+
+    renderTemps();
+
+    // Wind
+    const windMph=parseFloat(c.wind_speed_10m), gustMph=parseFloat(c.wind_gusts_10m);
+    const bft=beaufort(windMph);
+    document.getElementById('windVal').textContent=windMph.toFixed(1);
+    document.getElementById('windSub').textContent=`Beaufort ${bft} · ${BFT_DESC[bft]} · gusts ${gustMph.toFixed(1)} mph`;
+    document.querySelectorAll('.bft-seg').forEach((seg,i)=>{seg.classList.remove('active','warn','danger');if(i<bft)seg.classList.add(bft>=10?'danger':bft>=7?'warn':'active');});
+    const dir=parseFloat(c.wind_direction_10m);
+    document.getElementById('dirVal').textContent=dir.toFixed(0);
+    document.getElementById('dirSub').textContent=`from the ${degToCard(dir)} (${dir.toFixed(0)}°)`;
+    document.getElementById('compassArrow').style.transform=`rotate(${dir}deg)`;
+    lastWindMph=windMph; lastWindDir=dir;
+    updateMapIcon();
+
+    // Waves
+    if(mc&&mc.wave_height!=null){
+      document.getElementById('waveVal').textContent=mToFt(parseFloat(mc.wave_height));
+      const per=mc.wave_period?`${parseFloat(mc.wave_period).toFixed(1)}s period`:'';
+      const wdir=mc.wave_direction!=null?` · from ${degToCard(mc.wave_direction)}`:'';
+      document.getElementById('waveSub').textContent=per+wdir;
+    } else {
+      document.getElementById('waveVal').textContent='N/A';
+      document.getElementById('waveSub').textContent='Marine data unavailable';
+    }
+
+    // Tides
+    try {
+      renderTides(tideData.hiloRes, tideData.predRes, tideData.levelRes, tideData.station);
+    } catch(te) {
+      console.warn('Tide render error:',te);
+      document.getElementById('tideBadge').textContent='···';
+      document.getElementById('tideEvents').innerHTML='<div class="tide-event-row"><span style="font-size:0.52rem;opacity:0.5">Tide data unavailable for this location</span></div>';
+    }
+
+    // Forecast scroll — initial load, auto-scroll to Now
+    renderForecastScroll(true);
+
+    setSkeleton(false);
+    const now=new Date().toLocaleString('en-US',{weekday:'short',hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
+    setStatus('','Live · '+currentName);
+    document.getElementById('ts').textContent='Last updated · '+now;
+
+  } catch(e) {
+    console.error(e);
+    setStatus('error','Failed to fetch — check connection');
+    setSkeleton(false);
+    document.getElementById('ts').textContent='— Update failed —';
+  }
+}
+
+// ─── Scroll strip: click-drag + contain scroll to strip only ─────────────────
+function initForecastScrollDrag() {
+  let dragging = false, startX = 0, startLeft = 0;
+
+  function strip() { return document.getElementById('forecastScroll'); }
+
+  // Block wheel from scrolling the page when pointer is over the strip.
+  // Must be on window with passive:false to be able to preventDefault.
+  window.addEventListener('wheel', function(e) {
+    const s = strip();
+    if (!s) return;
+    const r = s.getBoundingClientRect();
+    const overStrip = e.clientX >= r.left && e.clientX <= r.right &&
+                      e.clientY >= r.top  && e.clientY <= r.bottom;
+    if (overStrip) {
+      e.preventDefault();
+      e.stopPropagation();
+      s.scrollLeft += e.deltaY || e.deltaX;
+    }
+  }, { passive: false, capture: true });
+
+  // Mousedown inside strip → start drag
+  window.addEventListener('mousedown', function(e) {
+    const s = strip();
+    if (!s) return;
+    const r = s.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right &&
+                   e.clientY >= r.top  && e.clientY <= r.bottom;
+    if (!inside) return;
+    dragging  = true;
+    startX    = e.clientX;
+    startLeft = s.scrollLeft;
+    s.classList.add('is-dragging');
+    e.preventDefault();
+    e.stopPropagation();
+  }, { capture: true });
+
+  window.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    const s = strip();
+    if (s) s.scrollLeft = startLeft - (e.clientX - startX);
+    e.preventDefault();
+  }, { capture: true });
+
+  window.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    const s = strip();
+    if (s) s.classList.remove('is-dragging');
+  }, { capture: true });
+}
+
+// ─── Tide chart: drag horizontally to scrub time (−24h … +24h) ───────────────
+// ─── Tide chart: independent drag-to-scrub (does NOT affect weather cards) ───
+// ─── Tide chart: drag horizontally to scrub time
+
+// ─── Tide chart: drag horizontally to scrub time — synced with time nav slider ─
+function initTideChartDrag() {
+  const svg = document.getElementById('tideChartSvg');
+  if (!svg) return;
+
+  let active = false, dragStartX = 0, dragStartOffset = 0;
+
+  const pxPerHour = () => CHART.PX_PER_HOUR; // matches virtual canvas scale exactly
+
+  function onStart(e) {
+    active = true;
+    dragStartX      = e.clientX;
+    dragStartOffset = timeOffsetHours; // start from shared state
+    svg.setPointerCapture(e.pointerId);
+    svg.style.cursor = 'grabbing';
+    lockScroll();
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!active) return;
+    const dx      = e.clientX - dragStartX;
+    const dhour   = -dx / pxPerHour();
+    const clamped = Math.max(-168, Math.min(168, Math.round(dragStartOffset + dhour)));
+    if (clamped === timeOffsetHours) return;
+    // setTimeOffset updates slider, badge, weather, tide display — everything
+    setTimeOffset(clamped);
+    e.preventDefault();
+  }
+
+  function onEnd() {
+    if (!active) return;
+    active = false;
+    svg.style.cursor = 'ew-resize';
+    unlockScroll();
+  }
+
+  svg.addEventListener('pointerdown',   onStart);
+  svg.addEventListener('pointermove',   onMove);
+  svg.addEventListener('pointerup',     onEnd);
+  svg.addEventListener('pointercancel', onEnd);
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+initMap();
+initForecastScrollDrag();
+initTideChartDrag();
+initTimeSlider();
+fetchAll();
+setInterval(fetchAll,60*1000);
+</script>
+</body>
+</html>
