@@ -107,6 +107,14 @@ header {
 .dropdown-item .di-delete-btn:hover { opacity: 1; color: var(--rust); background: rgba(192,57,43,0.12); }
 .dropdown-divider { height: 1px; background: rgba(74,144,217,0.1); margin: 0; }
 
+/* Geocode search spinner */
+.geo-spinner {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid rgba(74,144,217,0.2); border-top-color: var(--sky);
+  animation: spin 0.7s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Map overlay save-pin button — added via Leaflet control so it's always above tiles */
 .map-pin-btn {
   width: 34px; height: 34px; border-radius: 4px;
@@ -132,6 +140,18 @@ header {
 .green-pin:hover { transform: scale(1.45); }
 .green-pin.is-active { background: #80e8a0; box-shadow: 0 0 10px rgba(39,174,96,0.9); animation: none; }
 @keyframes gpPulse { 0%{box-shadow:0 0 0 0 rgba(39,174,96,0.7)} 70%{box-shadow:0 0 0 12px rgba(39,174,96,0)} 100%{box-shadow:0 0 0 0 rgba(39,174,96,0)} }
+
+/* Red custom saved pins on map */
+.red-pin {
+  width: 14px; height: 14px; background: var(--rust);
+  border: 2.5px solid var(--white); border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(192,57,43,0.7);
+  animation: rpPulse 2.8s ease-out infinite;
+  cursor: pointer; transition: transform 0.15s;
+}
+.red-pin:hover { transform: scale(1.45); }
+.red-pin.is-active { background: #ff9080; box-shadow: 0 0 10px rgba(192,57,43,0.9); animation: none; }
+@keyframes rpPulse { 0%{box-shadow:0 0 0 0 rgba(192,57,43,0.7)} 70%{box-shadow:0 0 0 12px rgba(192,57,43,0)} 100%{box-shadow:0 0 0 0 rgba(192,57,43,0)} }
 
 /* Green location dot in dropdown */
 .di-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 7px var(--green); flex-shrink: 0; margin-left: auto; opacity: 0; transition: opacity 0.2s; }
@@ -723,16 +743,17 @@ function initMap() {
   });
 }
 
-function buildGreenPinHTML(isActive) {
-  return `<div class="green-pin${isActive?' is-active':''}"></div>`;
+function buildPinHTML(isActive, isCustom) {
+  const cls = isCustom ? 'red-pin' : 'green-pin';
+  return `<div class="${cls}${isActive?' is-active':''}"></div>`;
 }
 
 function getAllPinLocations() {
-  // Merge PIERS + saved pins, deduplicating by coords so we don't double-render
-  const all = [...PIERS];
+  // Merge PIERS (custom=false) + saved pins (custom=true), deduplicating by coords
+  const all = PIERS.map(p => ({ ...p, isCustom: false }));
   loadPins().forEach(sp => {
     const already = all.some(p => Math.abs(p.lat - sp.lat) < 0.00001 && Math.abs(p.lon - sp.lon) < 0.00001);
-    if (!already) all.push({ name: sp.name, lat: sp.lat, lon: sp.lon, icon: sp.icon || '📍' });
+    if (!already) all.push({ name: sp.name, lat: sp.lat, lon: sp.lon, icon: sp.icon || '📍', isCustom: true });
   });
   return all;
 }
@@ -744,7 +765,7 @@ function addGreenPinMarkers() {
 
   getAllPinLocations().forEach(p => {
     const isActive = Math.abs(p.lat - currentLat) < 0.00001 && Math.abs(p.lon - currentLon) < 0.00001;
-    const icon = L.divIcon({className:'', html: buildGreenPinHTML(isActive), iconSize:[14,14], iconAnchor:[7,7]});
+    const icon = L.divIcon({className:'', html: buildPinHTML(isActive, p.isCustom), iconSize:[14,14], iconAnchor:[7,7]});
     const marker = L.marker([p.lat, p.lon], {icon, zIndexOffset:200, title: p.name})
       .addTo(leafletMap)
       .bindPopup(`<div style="font-family:Space Mono,monospace;font-size:11px;color:#0a1628;line-height:1.6"><strong>${p.icon} ${p.name}</strong><br>${fmtCoord(p.lat,p.lon)}</div>`,{offset:[0,-8]});
@@ -781,7 +802,7 @@ function updateMapIcon() {
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
-function buildDropdown(filter='') {
+function buildDropdown(filter='', geoResults=null, searching=false) {
   const dd = document.getElementById('searchDropdown');
   const f = filter.toLowerCase().trim();
   const pins = loadPins();
@@ -803,10 +824,10 @@ function buildDropdown(filter='') {
         <button class="di-delete-btn" title="Remove saved location" onclick="removePin(${lat},${lon},event)">✕</button>
       </div>`;
     }).join('');
-    if (filteredPiers.length) html += '<div class="dropdown-divider"></div>';
+    if (filteredPiers.length || geoResults || searching) html += '<div class="dropdown-divider"></div>';
   }
 
-  // Preset locations section — no save/pin buttons
+  // Preset locations section
   if (filteredPiers.length) {
     html += '<div class="dropdown-header">Locations</div>';
     html += filteredPiers.map(p => {
@@ -818,18 +839,90 @@ function buildDropdown(filter='') {
         <span class="di-dot"></span>
       </div>`;
     }).join('');
+    if (geoResults || searching) html += '<div class="dropdown-divider"></div>';
+  }
+
+  // Geocode search results
+  if (searching) {
+    html += '<div class="dropdown-header" style="display:flex;align-items:center;gap:0.5rem;"><span class="geo-spinner"></span> Searching…</div>';
+  } else if (geoResults && geoResults.length > 0) {
+    html += '<div class="dropdown-header">🌐 Search Results</div>';
+    html += geoResults.map(r => {
+      const name = r.name.replace(/'/g,"\\'");
+      const icon = getSearchIcon(r.type);
+      return `<div class="dropdown-item" onclick="selectLocation(${r.lat},${r.lon},'${name}')">
+        <span class="di-icon">${icon}</span>
+        <span><div class="di-name">${r.name}</div><div class="di-coords">${fmtCoord(r.lat,r.lon)}</div></span>
+      </div>`;
+    }).join('');
+  } else if (geoResults && geoResults.length === 0 && f) {
+    html += '<div class="dropdown-header" style="opacity:0.5;">No results found</div>';
   }
 
   if (!html) {
-    dd.innerHTML = '<div class="dropdown-header">No matching locations</div>';
-  } else {
-    dd.innerHTML = html;
+    html = '<div class="dropdown-header">Start typing to search…</div>';
   }
+  dd.innerHTML = html;
 }
 const openDropdown=()=>{buildDropdown(document.getElementById('searchInput').value);document.getElementById('searchDropdown').classList.add('open');};
 const closeDropdown=()=>document.getElementById('searchDropdown').classList.remove('open');
 
-// ─── Reverse geocode (Nominatim) ──────────────────────────────────────────────
+// ─── Geocode helpers (must be defined before input listener) ──────────────────
+let geocodeTimer = null;
+
+async function geocodeSearch(query) {
+  try {
+    const q = encodeURIComponent(query);
+    const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=6&addressdetails=1`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'CoastalConditionsApp/1.0' } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map(r => ({
+      name: r.display_name.split(',').slice(0, 3).join(',').trim(),
+      lat: parseFloat(r.lat),
+      lon: parseFloat(r.lon),
+      type: r.type || r.class || '',
+    }));
+  } catch(e) {
+    console.warn('Geocode error:', e);
+    return [];
+  }
+}
+
+function getSearchIcon(type) {
+  const t = (type||'').toLowerCase();
+  if (t.includes('pier') || t.includes('jetty') || t.includes('dock')) return '🎣';
+  if (t.includes('beach') || t.includes('sand')) return '🏖️';
+  if (t.includes('marina') || t.includes('harbour') || t.includes('harbor')) return '⚓';
+  if (t.includes('park') || t.includes('nature')) return '🌿';
+  if (t.includes('water') || t.includes('bay') || t.includes('cove') || t.includes('inlet')) return '🌊';
+  return '📍';
+}
+
+document.getElementById('searchInput').addEventListener('focus', openDropdown);
+
+document.getElementById('searchInput').addEventListener('input', () => {
+  const val = document.getElementById('searchInput').value;
+  const f = val.trim();
+  document.getElementById('searchDropdown').classList.add('open');
+
+  if (!f || f.length < 3) {
+    buildDropdown(val);
+    clearTimeout(geocodeTimer);
+    return;
+  }
+
+  // Show locals + spinner immediately
+  buildDropdown(val, null, true);
+
+  clearTimeout(geocodeTimer);
+  geocodeTimer = setTimeout(async () => {
+    const results = await geocodeSearch(f);
+    if (document.getElementById('searchInput').value === val) {
+      buildDropdown(val, results);
+    }
+  }, 500);
+});
 async function reverseGeocode(lat, lon) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
@@ -869,7 +962,6 @@ function selectLocation(lat, lon, name, skipGeocode) {
   }
 }
 document.getElementById('searchInput').addEventListener('focus',openDropdown);
-document.getElementById('searchInput').addEventListener('input',()=>{buildDropdown(document.getElementById('searchInput').value);document.getElementById('searchDropdown').classList.add('open');});
 document.getElementById('searchInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     const val=document.getElementById('searchInput').value.trim();
