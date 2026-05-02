@@ -101,10 +101,38 @@ header {
 .dropdown-item .di-coords { font-size: 0.5rem; letter-spacing: 0.08em; color: var(--foam); opacity: 0.5; margin-top: 1px; }
 .dropdown-item .di-delete-btn {
   margin-left: 0.4rem; flex-shrink: 0; background: none; border: none; cursor: pointer;
-  font-size: 0.7rem; color: var(--foam); opacity: 0.3; padding: 2px 4px; border-radius: 3px;
+  font-size: 0.95rem; color: var(--foam); opacity: 0.3; padding: 3px 6px; border-radius: 3px;
   transition: opacity 0.15s, color 0.15s, background 0.15s; line-height: 1;
 }
 .dropdown-item .di-delete-btn:hover { opacity: 1; color: var(--rust); background: rgba(192,57,43,0.12); }
+
+/* Hide-location eye button — always visible */
+.dropdown-item .di-hide-btn {
+  margin-left: 0.4rem; flex-shrink: 0; background: none; border: none; cursor: pointer;
+  font-size: 1rem; opacity: 0.35; padding: 3px 6px; border-radius: 3px;
+  transition: opacity 0.15s, background 0.15s; line-height: 1; color: var(--foam);
+}
+.dropdown-item .di-hide-btn:hover { opacity: 1 !important; background: rgba(74,144,217,0.12); }
+
+/* Show (restore) eye button in hidden section */
+.dropdown-item .di-show-btn {
+  flex-shrink: 0; background: none; border: none; cursor: pointer;
+  font-size: 1rem; opacity: 0.35; padding: 3px 6px; border-radius: 3px;
+  transition: opacity 0.15s, background 0.15s; line-height: 1; color: var(--foam);
+}
+.dropdown-item .di-show-btn:hover { opacity: 1; background: rgba(74,144,217,0.12); }
+.dd-manage-btn {
+  background: none; border: 1px solid rgba(74,144,217,0.2); color: var(--foam);
+  font-family: 'Space Mono', monospace; font-size: 0.46rem; letter-spacing: 0.08em;
+  padding: 2px 7px; border-radius: 3px; cursor: pointer; opacity: 0.6;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+.dd-manage-btn:hover { opacity: 1; border-color: var(--sky); }
+
+/* Hidden location rows */
+.dd-hidden-label { font-size: 0.46rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--foam); opacity: 0.35; padding: 0.35rem 1rem 0.2rem; }
+.di-hidden-row { opacity: 0.6; }
 .dropdown-divider { height: 1px; background: rgba(74,144,217,0.1); margin: 0; }
 
 /* Geocode search spinner */
@@ -618,6 +646,31 @@ function loadPins() {
 function savePins(pins) {
   try { localStorage.setItem(PINS_KEY, JSON.stringify(pins)); } catch {}
 }
+
+// ─── Hidden Locations (keyed by "lat,lon" to work for presets and custom pins) ─
+const HIDDEN_KEY = 'coastalConditions_hiddenPiers';
+const hiddenKey = (lat, lon) => `${parseFloat(lat).toFixed(6)},${parseFloat(lon).toFixed(6)}`;
+function loadHidden() {
+  try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY)) || []); } catch { return new Set(); }
+}
+function saveHidden(set) {
+  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set])); } catch {}
+}
+function isHidden(lat, lon) { return loadHidden().has(hiddenKey(lat, lon)); }
+function toggleHideLocation(lat, lon, event) {
+  event.stopPropagation();
+  const hidden = loadHidden();
+  const k = hiddenKey(lat, lon);
+  hidden.has(k) ? hidden.delete(k) : hidden.add(k);
+  saveHidden(hidden);
+  buildDropdown(document.getElementById('searchInput').value);
+  refreshGreenPins();
+}
+function toggleShowHidden(event) {
+  event.stopPropagation();
+  showingHidden = !showingHidden;
+  buildDropdown(document.getElementById('searchInput').value);
+}
 function isPinned(lat, lon) {
   return loadPins().some(p => Math.abs(p.lat - lat) < 0.00001 && Math.abs(p.lon - lon) < 0.00001);
 }
@@ -641,6 +694,10 @@ function removePin(lat, lon, event) {
   event.stopPropagation();
   const pins = loadPins().filter(p => !(Math.abs(p.lat - lat) < 0.00001 && Math.abs(p.lon - lon) < 0.00001));
   savePins(pins);
+  // Also remove from hidden set so no orphan key remains
+  const hidden = loadHidden();
+  hidden.delete(hiddenKey(lat, lon));
+  saveHidden(hidden);
   updatePinButton();
   refreshGreenPins();
   buildDropdown(document.getElementById('searchInput').value);
@@ -749,9 +806,10 @@ function buildPinHTML(isActive, isCustom) {
 }
 
 function getAllPinLocations() {
-  // Merge PIERS (custom=false) + saved pins (custom=true), deduplicating by coords
-  const all = PIERS.map(p => ({ ...p, isCustom: false }));
+  const hidden = loadHidden();
+  const all = PIERS.filter(p => !hidden.has(hiddenKey(p.lat, p.lon))).map(p => ({ ...p, isCustom: false }));
   loadPins().forEach(sp => {
+    if (hidden.has(hiddenKey(sp.lat, sp.lon))) return;
     const already = all.some(p => Math.abs(p.lat - sp.lat) < 0.00001 && Math.abs(p.lon - sp.lon) < 0.00001);
     if (!already) all.push({ name: sp.name, lat: sp.lat, lon: sp.lon, icon: sp.icon || '📍', isCustom: true });
   });
@@ -802,47 +860,85 @@ function updateMapIcon() {
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
+let showingHidden = false;
+
 function buildDropdown(filter='', geoResults=null, searching=false) {
   const dd = document.getElementById('searchDropdown');
   const f = filter.toLowerCase().trim();
   const pins = loadPins();
-  const filteredPiers = PIERS.filter(p => !f || p.name.toLowerCase().includes(f));
-  const filteredPins  = pins.filter(p => !f || p.name.toLowerCase().includes(f));
+  const hidden = loadHidden();
+
+  // Custom saved pins
+  const visiblePins = pins.filter(p => !hidden.has(hiddenKey(p.lat, p.lon)) && (!f || p.name.toLowerCase().includes(f)));
+  const hiddenPins  = pins.filter(p =>  hidden.has(hiddenKey(p.lat, p.lon)) && (!f || p.name.toLowerCase().includes(f)));
+
+  // Preset locations
+  const visiblePiers = PIERS.filter(p => !hidden.has(hiddenKey(p.lat, p.lon)) && (!f || p.name.toLowerCase().includes(f)));
+  const hiddenPiers  = PIERS.filter(p =>  hidden.has(hiddenKey(p.lat, p.lon)) && (!f || p.name.toLowerCase().includes(f)));
+
+  const totalHidden = hiddenPins.length + hiddenPiers.length;
 
   let html = '';
 
-  // Saved pins section
-  if (filteredPins.length) {
+  // ── Saved Locations ──
+  if (visiblePins.length) {
     html += '<div class="dropdown-header">★ Saved Locations</div>';
-    html += filteredPins.map(p => {
+    html += visiblePins.map(p => {
       const lat = p.lat, lon = p.lon, name = p.name.replace(/'/g,"\\'");
-      const active = Math.abs(p.lat - currentLat) < 0.00001 && Math.abs(p.lon - currentLon) < 0.00001;
+      const active = Math.abs(lat - currentLat) < 0.00001 && Math.abs(lon - currentLon) < 0.00001;
       return `<div class="dropdown-item${active?' is-active':''}" onclick="selectLocation(${lat},${lon},'${name}',true)">
         <span class="di-icon">${p.icon || '📍'}</span>
         <span><div class="di-name">${p.name}</div><div class="di-coords">${fmtCoord(lat,lon)}</div></span>
         <span class="di-dot"></span>
+        <button class="di-hide-btn" title="Hide location" onclick="toggleHideLocation(${lat},${lon},event)">👁</button>
         <button class="di-delete-btn" title="Remove saved location" onclick="removePin(${lat},${lon},event)">✕</button>
       </div>`;
     }).join('');
-    if (filteredPiers.length || geoResults || searching) html += '<div class="dropdown-divider"></div>';
+    if (visiblePiers.length || totalHidden || geoResults || searching) html += '<div class="dropdown-divider"></div>';
   }
 
-  // Preset locations section
-  if (filteredPiers.length) {
-    html += '<div class="dropdown-header">Locations</div>';
-    html += filteredPiers.map(p => {
+  // ── Preset Locations ──
+  if (visiblePiers.length || totalHidden) {
+    const headerRight = totalHidden
+      ? `<button class="dd-manage-btn" onclick="toggleShowHidden(event)">${showingHidden ? '▲ Done' : `${totalHidden} hidden`}</button>`
+      : '';
+    html += `<div class="dropdown-header" style="display:flex;justify-content:space-between;align-items:center;"><span>Locations</span>${headerRight}</div>`;
+
+    html += visiblePiers.map(p => {
       const active = Math.abs(p.lat - currentLat) < 0.00001 && Math.abs(p.lon - currentLon) < 0.00001;
       const name = p.name.replace(/'/g,"\\'");
       return `<div class="dropdown-item${active?' is-active':''}" onclick="selectLocation(${p.lat},${p.lon},'${name}',true)">
         <span class="di-icon">${p.icon}</span>
         <span><div class="di-name">${p.name}</div><div class="di-coords">${fmtCoord(p.lat,p.lon)}</div></span>
         <span class="di-dot"></span>
+        <button class="di-hide-btn" title="Hide location" onclick="toggleHideLocation(${p.lat},${p.lon},event)">👁</button>
       </div>`;
     }).join('');
+
+    // ── Hidden section (both custom + preset) ──
+    if (showingHidden && totalHidden) {
+      html += '<div class="dd-hidden-label">Hidden locations</div>';
+      html += [...hiddenPins.map(p => ({ ...p, isCustom: true })), ...hiddenPiers.map(p => ({ ...p, isCustom: false }))]
+        .map(p => {
+          const lat = p.lat, lon = p.lon, name = p.name.replace(/'/g,"\\'");
+          const icon = p.icon || '📍';
+          const deleteBtn = p.isCustom
+            ? `<button class="di-delete-btn" title="Delete saved location" onclick="removePin(${lat},${lon},event)">✕</button>`
+            : '';
+          return `<div class="dropdown-item di-hidden-row" onclick="selectLocation(${lat},${lon},'${name}',true)">
+            <span class="di-icon" style="opacity:0.4">${icon}</span>
+            <span><div class="di-name" style="opacity:0.45">${p.name}</div><div class="di-coords">${fmtCoord(lat,lon)}</div></span>
+            <span class="di-dot"></span>
+            <button class="di-show-btn" title="Show location" onclick="toggleHideLocation(${lat},${lon},event)">👁</button>
+            ${deleteBtn}
+          </div>`;
+        }).join('');
+    }
+
     if (geoResults || searching) html += '<div class="dropdown-divider"></div>';
   }
 
-  // Geocode search results
+  // ── Geocode results ──
   if (searching) {
     html += '<div class="dropdown-header" style="display:flex;align-items:center;gap:0.5rem;"><span class="geo-spinner"></span> Searching…</div>';
   } else if (geoResults && geoResults.length > 0) {
@@ -859,9 +955,7 @@ function buildDropdown(filter='', geoResults=null, searching=false) {
     html += '<div class="dropdown-header" style="opacity:0.5;">No results found</div>';
   }
 
-  if (!html) {
-    html = '<div class="dropdown-header">Start typing to search…</div>';
-  }
+  if (!html) html = '<div class="dropdown-header">Start typing to search…</div>';
   dd.innerHTML = html;
 }
 const openDropdown=()=>{buildDropdown(document.getElementById('searchInput').value);document.getElementById('searchDropdown').classList.add('open');};
