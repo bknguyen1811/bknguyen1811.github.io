@@ -1085,7 +1085,60 @@ function renderTemps() {
 }
 document.getElementById('unitToggle').addEventListener('click',()=>{useFahrenheit=!useFahrenheit;renderTemps();renderForecastScroll();});
 
-// ─── NOAA Tide Stations ───────────────────────────────────────────────────────
+// ─── NOAA Water Temp — nearest station with live water temperature ─────────────
+// Uses the NOAA CO-OPS metadata API to find all stations that carry the
+// water_temperature product, picks the closest to the user's coords, then
+// fetches its latest reading. Same domain as tides so no CORS issues.
+
+let noaaWtempStationCache = null;
+
+async function fetchNOAAWtempStations() {
+  if (noaaWtempStationCache) return noaaWtempStationCache;
+  try {
+    const url = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=waterlevels&units=english';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('mdapi failed');
+    const data = await res.json();
+    // Filter to stations that have water_temperature sensor (sensor list includes WT)
+    // We'll fetch all and filter by trying — but first just return all with coords
+    noaaWtempStationCache = (data.stations || [])
+      .filter(s => s.lat && s.lng)
+      .map(s => ({ id: s.id, name: s.name, lat: parseFloat(s.lat), lon: parseFloat(s.lng) }));
+    return noaaWtempStationCache;
+  } catch { return []; }
+}
+
+async function fetchClosestNOAAWaterTemp(lat, lon) {
+  const stations = await fetchNOAAWtempStations();
+  if (!stations.length) return null;
+
+  // Sort by distance, try the nearest 8 until one returns water temp data
+  const nearest = stations
+    .map(s => ({ ...s, dist: Math.hypot(s.lat - lat, s.lon - lon) }))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 8);
+
+  const now = new Date();
+  const dateStr = fmtDate(now);
+
+  for (const s of nearest) {
+    try {
+      const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${s.id}&product=water_temperature&time_zone=lst_ldt&units=english&application=coastal_conditions&format=json&begin_date=${dateStr}&end_date=${dateStr}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data.data || !data.data.length) continue;
+      const val = parseFloat(data.data[data.data.length - 1].v);
+      if (isNaN(val)) continue;
+      const tempC = (val - 32) * 5 / 9; // NOAA returns °F
+      const distMi = (s.dist * 69).toFixed(0);
+      return { tempC, stationId: s.id, stationName: s.name, distMi };
+    } catch { continue; }
+  }
+  return null;
+}
+
+
 const NOAA_STATIONS=[
   {id:'8638863',name:'CBBT',              lat:36.972,lon:-76.113},
   {id:'8638610',name:'Sewells Point',     lat:36.947,lon:-76.330},
@@ -1550,11 +1603,12 @@ async function fetchAll() {
   const lat=currentLat,lon=currentLon;
 
   try {
-    const [wx, marine, tideData] = await Promise.all([
+    const [wx, marine, tideData, closestWtemp] = await Promise.all([
       // Hourly: past 24h + next 24h
       fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=America%2FNew_York&past_days=7&forecast_days=7`).then(r=>r.json()),
       fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_period,wave_direction,sea_surface_temperature&hourly=wave_height,wave_direction&timezone=America%2FNew_York&past_days=7&forecast_days=7`).then(r=>r.json()),
-      fetchTides(lat,lon)
+      fetchTides(lat,lon),
+      fetchClosestNOAAWaterTemp(lat, lon).catch(()=>null),
     ]);
 
     const c=wx.current, mc=marine.current;
@@ -1565,12 +1619,17 @@ async function fetchAll() {
 
     // Air temp
     lastTempC=c.temperature_2m; lastFeelsC=c.apparent_temperature;
-    // Water temp — prefer NOAA observed (°F), convert to °C for storage; fall back to marine API (already °C)
+
+    // Water temp priority: 1) nearest NDBC buoy  2) NOAA tide station  3) marine API SST
     const noaaWtemp = tideData.wtempRes && tideData.wtempRes.data && tideData.wtempRes.data.length
       ? parseFloat(tideData.wtempRes.data[tideData.wtempRes.data.length - 1].v)
       : null;
-    if (noaaWtemp !== null && !isNaN(noaaWtemp)) {
-      lastWaterC = (noaaWtemp - 32) * 5 / 9; // NOAA returns °F, store as °C
+
+    if (closestWtemp && !isNaN(closestWtemp.tempC)) {
+      lastWaterC = closestWtemp.tempC;
+      document.getElementById('waterSub').textContent = `NOAA ${closestWtemp.stationId} · ${closestWtemp.stationName} · ${closestWtemp.distMi}mi away`;
+    } else if (noaaWtemp !== null && !isNaN(noaaWtemp)) {
+      lastWaterC = (noaaWtemp - 32) * 5 / 9;
       document.getElementById('waterSub').textContent = `NOAA · ${tideData.station.name}`;
     } else if (mc && mc.sea_surface_temperature != null) {
       lastWaterC = mc.sea_surface_temperature;
