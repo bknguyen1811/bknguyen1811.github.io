@@ -400,6 +400,17 @@ header {
 .wind-info-row .wir-sub { font-size: 9px; opacity: 0.6; }
 .wind-info-divider { border: none; border-top: 1px solid rgba(74,144,217,0.18); margin: 5px 0; }
 
+.card-clock {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+  opacity: 0.85;
+  font-weight: normal;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* ── Refresh ── */
 .refresh-btn { display: block; margin: 0.3rem auto 0; padding: 0.62rem 2rem; background: transparent; border: 1px solid rgba(74,144,217,0.35); color: var(--sky); font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; border-radius: 3px; transition: background 0.2s, border-color 0.2s, color 0.2s; animation: fadeUp 0.65s 0.75s ease both; }
 .refresh-btn:hover { background: rgba(74,144,217,0.14); border-color: var(--sky); color: var(--white); }
@@ -510,7 +521,10 @@ footer a { color: var(--steel); }
 
   <!-- ── Full-width Tide Card ── -->
   <div class="tide-card-full">
-    <div class="card-label" style="margin-bottom:1rem;">Tidal Conditions <span style="opacity:0.4;font-size:0.46rem;margin-left:0.5rem;" id="tideStation">· nearest NOAA station</span></div>
+    <div class="card-label" style="margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
+      <span>Tidal Conditions <span style="opacity:0.4;font-size:0.46rem;margin-left:0.5rem;" id="tideStation">· nearest NOAA station</span></span>
+      <span class="card-clock" id="tideClock">––:–– ––</span>
+    </div>
 
     <div class="tide-top">
       <!-- Left: current reading -->
@@ -557,7 +571,10 @@ footer a { color: var(--steel); }
   <div class="time-nav">
     <div class="time-nav-label">
       <span>⏱ Time Navigator — Scrub Past &amp; Future Conditions</span>
-      <span class="time-nav-current" id="timeNavDisplay">Now</span>
+      <span style="display:flex;align-items:center;gap:0.75rem;">
+        <span class="card-clock" id="navClock">––:–– ––</span>
+        <span class="time-nav-current" id="timeNavDisplay">Now</span>
+      </span>
     </div>
     <div class="time-nav-row">
       <button class="time-nav-btn" onclick="stepTime(-1)">◀ 1h</button>
@@ -1017,6 +1034,28 @@ document.getElementById('searchInput').addEventListener('input', () => {
     }
   }, 500);
 });
+// ─── Live Clock ───────────────────────────────────────────────────────────────
+function tickClock() {
+  const base = (CHART && CHART.realNow) ? CHART.realNow : new Date();
+  const display = new Date(base.getTime() + (timeOffsetHours || 0) * 3600000);
+
+  const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const day  = days[display.getDay()];
+  const mon  = months[display.getMonth()];
+  const date = display.getDate();
+  let h = display.getHours(), m = display.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+
+  const str = `${day} ${mon} ${date} · ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+
+  const tideClock = document.getElementById('tideClock');
+  const navClock  = document.getElementById('navClock');
+  if (tideClock) tideClock.textContent = str;
+  if (navClock)  navClock.textContent  = str;
+}
+
 async function reverseGeocode(lat, lon) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`;
@@ -1416,6 +1455,7 @@ function setTimeOffset(h) {
   renderTideChart(atTime);
   renderTideDisplayAtOffset(atTime);
   renderForecastScroll();
+  tickClock();
 
   // Scroll the selected chip into view inside the strip only — not the page
   setTimeout(() => {
@@ -1798,6 +1838,8 @@ initForecastScrollDrag();
 initTideChartDrag();
 initTimeSlider();
 updatePinButton();
+tickClock();
+setInterval(tickClock, 1000);
 fetchAll();
 setInterval(fetchAll,60*1000);
 </script>
