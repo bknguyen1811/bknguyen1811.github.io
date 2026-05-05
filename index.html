@@ -313,6 +313,33 @@ header {
 /* Forecast panel */
 .forecast-panel { margin-top: 1rem; border-top: 1px solid rgba(74,144,217,0.1); padding-top: 1rem; }
 .forecast-label { font-size: 0.5rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--foam); opacity: 0.4; margin-bottom: 0.6rem; }
+/* ── 7-day forecast strip ── */
+.day-forecast-scroll {
+  display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.25rem 0.1rem 0.5rem;
+  scrollbar-width: thin; scrollbar-color: rgba(74,144,217,0.25) transparent;
+  cursor: grab; user-select: none;
+}
+.day-forecast-scroll.is-dragging { cursor: grabbing; }
+.day-forecast-scroll::-webkit-scrollbar { height: 3px; }
+.day-forecast-scroll::-webkit-scrollbar-thumb { background: rgba(74,144,217,0.25); border-radius: 2px; }
+.day-chip {
+  flex: 0 0 auto; min-width: 78px; max-width: 90px;
+  background: rgba(74,144,217,0.06); border: 1px solid rgba(74,144,217,0.15);
+  border-radius: 8px; padding: 0.6rem 0.45rem; cursor: pointer;
+  text-align: center; transition: background 0.18s, border-color 0.18s, transform 0.15s;
+  display: flex; flex-direction: column; gap: 0.28rem; align-items: center;
+}
+.day-chip:hover { background: rgba(74,144,217,0.14); border-color: rgba(74,144,217,0.4); transform: translateY(-2px); }
+.day-chip.is-today { border-color: rgba(232,160,48,0.55); background: rgba(232,160,48,0.07); }
+.day-chip.is-selected { border-color: var(--sky); background: rgba(74,144,217,0.18); box-shadow: 0 0 0 1px rgba(74,144,217,0.3); }
+.dc-day   { font-size: 0.52rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--foam); opacity: 0.7; }
+.dc-date  { font-size: 0.44rem; color: var(--foam); opacity: 0.4; margin-top: -0.1rem; }
+.dc-icon  { font-size: 1.05rem; line-height: 1; margin: 0.05rem 0; }
+.dc-temps { font-size: 0.62rem; color: var(--white); font-weight: 600; letter-spacing: 0.02em; }
+.dc-lo    { opacity: 0.45; font-weight: 400; margin-left: 0.2rem; font-size: 0.52rem; }
+.dc-wind  { font-size: 0.44rem; color: var(--foam); opacity: 0.6; letter-spacing: 0.04em; }
+.dc-wave  { font-size: 0.44rem; color: var(--sky); opacity: 0.75; }
+
 .forecast-scroll {
   display: flex;
   gap: 0.5rem;
@@ -597,6 +624,13 @@ footer a { color: var(--steel); }
       <button class="time-preset-btn" onclick="setTimeOffset(24)">+24h</button>
       <button class="time-preset-btn" onclick="setTimeOffset(72)">+3d</button>
       <button class="time-preset-btn" onclick="setTimeOffset(168)">+7d</button>
+      <button class="time-preset-btn" onclick="setTimeOffset(336)">+14d</button>
+    </div>
+
+    <!-- 7-day forecast -->
+    <div class="forecast-panel" style="margin-bottom:0.75rem;">
+      <div class="forecast-label">7-Day Outlook — Click a day to jump to noon conditions</div>
+      <div class="day-forecast-scroll" id="dayForecastScroll"></div>
     </div>
 
     <!-- Hourly forecast scroll -->
@@ -735,8 +769,8 @@ const BFT_DESC   = ['Calm','Light air','Light breeze','Gentle breeze','Moderate 
 
 const degToCard = d => DIR_LABELS[Math.round(d/22.5)%16];
 const beaufort  = mph => { for(let i=BFT_MPH.length-1;i>=0;i--) if(mph>=BFT_MPH[i]) return i; return 0; };
-const cToF      = c => (c*9/5+32).toFixed(1);
-const mToFt     = m => (m*3.28084).toFixed(1);
+const cToF      = c => c*9/5+32;
+const mToFt     = m => m*3.28084;
 const fmtCoord  = (lat,lon) => `${Math.abs(lat).toFixed(4)}°${lat>=0?'N':'S'} · ${Math.abs(lon).toFixed(4)}°${lon>=0?'E':'W'}`;
 const pad       = n => String(n).padStart(2,'0');
 const fmtDate   = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
@@ -1112,17 +1146,17 @@ function setSkeleton(on){['tempVal','waterVal','windVal','dirVal','waveVal'].for
 // ─── Render temps ─────────────────────────────────────────────────────────────
 function renderTemps() {
   if(lastTempC!==null){
-    document.getElementById('tempVal').textContent=useFahrenheit?cToF(lastTempC):parseFloat(lastTempC).toFixed(1);
+    document.getElementById('tempVal').textContent=useFahrenheit?cToF(lastTempC).toFixed(1):parseFloat(lastTempC).toFixed(1);
     document.getElementById('tempUnit').textContent=useFahrenheit?'°F':'°C';
-    document.getElementById('tempSub').textContent=lastFeelsC!==null?`feels like ${useFahrenheit?cToF(lastFeelsC):parseFloat(lastFeelsC).toFixed(1)} ${useFahrenheit?'°F':'°C'}`:'';
+    document.getElementById('tempSub').textContent=lastFeelsC!==null?`feels like ${useFahrenheit?cToF(lastFeelsC).toFixed(1):parseFloat(lastFeelsC).toFixed(1)} ${useFahrenheit?'°F':'°C'}`:'';
   }
   if(lastWaterC!==null){
-    document.getElementById('waterVal').textContent=useFahrenheit?cToF(lastWaterC):parseFloat(lastWaterC).toFixed(1);
+    document.getElementById('waterVal').textContent=useFahrenheit?cToF(lastWaterC).toFixed(1):parseFloat(lastWaterC).toFixed(1);
     document.getElementById('waterUnit').textContent=useFahrenheit?'°F':'°C';
     updateMapIcon();
   }
 }
-document.getElementById('unitToggle').addEventListener('click',()=>{useFahrenheit=!useFahrenheit;renderTemps();renderForecastScroll();});
+document.getElementById('unitToggle').addEventListener('click',()=>{useFahrenheit=!useFahrenheit;renderTemps();renderDayForecast();renderForecastScroll();});
 
 // ─── NOAA Water Temp — nearest station with live water temperature ─────────────
 // Uses the NOAA CO-OPS metadata API to find all stations that carry the
@@ -1191,15 +1225,15 @@ async function fetchTides(lat,lon) {
   const station = nearestStation(lat,lon);
   const now     = new Date();
 
-  // 7 days back and 7 days forward
-  const past7   = new Date(now); past7.setDate(past7.getDate() - 7);
-  const future7 = new Date(now); future7.setDate(future7.getDate() + 7);
+  // 7 days back, 14 days forward to cover the full 2-week outlook
+  const past7    = new Date(now); past7.setDate(past7.getDate() - 7);
+  const future14 = new Date(now); future14.setDate(future14.getDate() + 14);
 
-  // Hi/Lo events: full 14-day window for event list
-  const hiloUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=hilo&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(past7)}&end_date=${fmtDate(future7)}`;
+  // Hi/Lo events: full window for event list and tide card
+  const hiloUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=hilo&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(past7)}&end_date=${fmtDate(future14)}`;
 
-  // 6-min predictions for the full 14-day curve (consistent scale, no seam)
-  const predUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=6&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(past7)}&end_date=${fmtDate(future7)}`;
+  // 6-min predictions for the full curve
+  const predUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=6&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(past7)}&end_date=${fmtDate(future14)}`;
 
   // Current observed water level (today only — just for the "ft MSL" readout)
   const levelUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?station=${station.id}&product=water_level&datum=MLLW&time_zone=lst_ldt&units=english&application=coastal_conditions&format=json&begin_date=${fmtDate(now)}&end_date=${fmtDate(now)}`;
@@ -1337,14 +1371,18 @@ function renderTideChart(atTime) {
   `;
 }
 function renderTides(hiloRes, predRes, levelRes, station) {
+  // NOAA returns times as "YYYY-MM-DD HH:mm" local station time (no Z).
+  // parseLocalISO handles these correctly as wall-clock local time.
+  const parseTideTime = t => parseLocalISO(t.replace(' ', 'T'));
+
   // Hi/Lo events for the info panel
   tidePredictions = (hiloRes.predictions||[]).map(p => ({
-    time: new Date(p.t.replace(' ','T')), type: p.type, ft: parseFloat(p.v)
+    time: parseTideTime(p.t), type: p.type, ft: parseFloat(p.v)
   }));
 
-  // Curve: use NOAA 6-min predictions for the ENTIRE range — no seam, no mismatch
+  // Curve: use NOAA 6-min predictions for the ENTIRE range
   tideCurveData = (predRes.predictions||[]).map(p => ({
-    time: new Date(p.t.replace(' ','T')), ft: parseFloat(p.v)
+    time: parseTideTime(p.t), ft: parseFloat(p.v)
   }));
 
   // Current observed water level — most recent reading for the "ft MSL" display
@@ -1437,7 +1475,7 @@ function stepTime(delta) {
 }
 
 function setTimeOffset(h) {
-  timeOffsetHours = Math.max(-168, Math.min(168, h));
+  timeOffsetHours = Math.max(-168, Math.min(336, h));
 
   updateSliderVisual(timeOffsetHours);
 
@@ -1454,17 +1492,30 @@ function setTimeOffset(h) {
   renderWeatherAtOffset();
   renderTideChart(atTime);
   renderTideDisplayAtOffset(atTime);
+  renderDayForecast();
   renderForecastScroll();
   tickClock();
 
-  // Scroll the selected chip into view inside the strip only — not the page
+  // Scroll the selected chip into view inside both strips
   setTimeout(() => {
+    // Hourly strip — center the selected chip
     const strip = document.getElementById('forecastScroll');
     const chip  = document.getElementById(`chip-${timeOffsetHours}`);
     if (strip && chip) {
       const sr = strip.getBoundingClientRect();
       const cr = chip.getBoundingClientRect();
       strip.scrollLeft += cr.left - sr.left - (sr.width - cr.width) / 2;
+    }
+
+    // Day strip — scroll selected day card into view
+    const dayStrip = document.getElementById('dayForecastScroll');
+    if (dayStrip) {
+      const selected = dayStrip.querySelector('.is-selected');
+      if (selected) {
+        const dr = dayStrip.getBoundingClientRect();
+        const sr2 = selected.getBoundingClientRect();
+        dayStrip.scrollLeft += sr2.left - dr.left - (dr.width - sr2.width) / 2;
+      }
     }
   }, 30);
 }
@@ -1478,15 +1529,16 @@ function updateSliderVisual(h) {
   const thumb = document.getElementById('timeSliderThumb');
   const fill  = document.getElementById('timeSliderFill');
   if (!thumb || !fill) return;
-  const pct = ((h + 168) / 336) * 100;          // 0–100% over ±168h range
+  const TOTAL = 504; // -168 to +336
+  const pct = ((h + 168) / TOTAL) * 100;   // 0% = -168h, ~33% = 0 (now), 100% = +336h
+  const nowPct = (168 / TOTAL) * 100;       // where "Now" sits on the track
   thumb.style.left = pct + '%';
-  const center = 50;
-  if (pct >= center) {
-    fill.style.left  = center + '%';
-    fill.style.width = (pct - center) + '%';
+  if (pct >= nowPct) {
+    fill.style.left  = nowPct + '%';
+    fill.style.width = (pct - nowPct) + '%';
   } else {
     fill.style.left  = pct + '%';
-    fill.style.width = (center - pct) + '%';
+    fill.style.width = (nowPct - pct) + '%';
   }
 }
 
@@ -1501,7 +1553,7 @@ function initTimeSlider() {
     const r = wrap.getBoundingClientRect();
     return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
   }
-  function offsetFromPct(p) { return Math.round(p * 336 - 168); }
+  function offsetFromPct(p) { return Math.round(p * 504 - 168); }
 
   wrap.addEventListener('pointerdown', e => {
     active = true;
@@ -1527,10 +1579,10 @@ function renderWeatherAtOffset() {
   if(!wxHourlyData) return;
   const hours=wxHourlyData.hourly;
   const atTime=new Date(Date.now()+timeOffsetHours*3600000);
-  // Find closest hourly index
+  // Find closest hourly index using local-time parsing (Open-Meteo times have no Z suffix)
   let bestIdx=0,bestDiff=Infinity;
   hours.time.forEach((t,i)=>{
-    const d=Math.abs(new Date(t)-atTime);
+    const d=Math.abs(parseLocalISO(t)-atTime);
     if(d<bestDiff){bestDiff=d;bestIdx=i;}
   });
 
@@ -1565,7 +1617,7 @@ function renderWeatherAtOffset() {
   }
   // Waves (from marine hourly if available)
   if(wh!=null){
-    document.getElementById('waveVal').textContent=mToFt(wh);
+    document.getElementById('waveVal').textContent=mToFt(wh).toFixed(1);
   }
 }
 
@@ -1585,6 +1637,97 @@ function renderTideDisplayAtOffset(atTime) {
 }
 
 // ─── Hourly forecast scroll ────────────────────────────────────────────────────
+function wxIcon(windMph, waveHft) {
+  if (windMph > 25) return '🌬️';
+  if (windMph > 15) return '💨';
+  if (waveHft > 4)  return '🌊';
+  if (waveHft > 2)  return '〰️';
+  return '☀️';
+}
+
+// ─── Date/time helpers ────────────────────────────────────────────────────────
+// Open-Meteo and NOAA return "YYYY-MM-DDTHH:mm" with no Z — treat as local time
+function parseLocalISO(s) {
+  const [date, time] = s.split('T');
+  const [y, mo, d]   = date.split('-').map(Number);
+  const [h, m]       = (time || '00:00').split(':').map(Number);
+  return new Date(y, mo - 1, d, h, m, 0, 0);
+}
+
+function localDateKey(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+function renderDayForecast() {
+  if (!wxHourlyData) return;
+  const hours = wxHourlyData.hourly;
+  const now   = new Date();
+  const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const dayMap = new Map(); // "YYYY-MM-DD" → { date, temps, winds, waves, noonOffset }
+
+  for (let i = 0; i < hours.time.length; i++) {
+    const t     = parseLocalISO(hours.time[i]);
+    const diffH = Math.round((t - now) / 3600000);
+    if (diffH < -1 || diffH > 14 * 24) continue;  // up to 2 weeks ahead
+
+    const key = localDateKey(t);
+    if (!dayMap.has(key)) dayMap.set(key, { date: t, temps: [], winds: [], waves: [], noonOffset: null });
+    const d = dayMap.get(key);
+
+    if (hours.temperature_2m[i]  != null) d.temps.push(hours.temperature_2m[i]);
+    if (hours.wind_speed_10m[i]  != null) d.winds.push(hours.wind_speed_10m[i]);
+    if (hours.wave_height && hours.wave_height[i] != null) d.waves.push(hours.wave_height[i]);
+
+    // Track the hour closest to noon as the click-jump target
+    const hr = t.getHours();
+    if (d.noonOffset === null || Math.abs(hr - 12) < Math.abs(12 - (12 - Math.abs(hr - 12)))) {
+      const existing = d.noonOffset !== null
+        ? parseLocalISO(hours.time[i - (diffH - d.noonOffset)]).getHours()
+        : 99;
+      if (d.noonOffset === null || Math.abs(hr - 12) < Math.abs(existing - 12)) {
+        d.noonOffset = diffH;
+      }
+    }
+  }
+
+  const container = document.getElementById('dayForecastScroll');
+  if (!container) return;
+
+  const todayKey    = localDateKey(now);
+  const selectedKey = localDateKey(new Date(now.getTime() + timeOffsetHours * 3600000));
+
+  const chips = [...dayMap.entries()].slice(0, 14).map(([key, d]) => {
+    const isToday    = key === todayKey;
+    const isSelected = key === selectedKey;
+    const hi  = d.temps.length ? Math.max(...d.temps) : null;
+    const lo  = d.temps.length ? Math.min(...d.temps) : null;
+    const avgWind = d.winds.length ? d.winds.reduce((a,b)=>a+b,0)/d.winds.length : 0;
+    const avgWave = d.waves.length ? d.waves.reduce((a,b)=>a+b,0)/d.waves.length : 0;
+    const hiDisp  = hi != null ? (useFahrenheit ? cToF(hi).toFixed(0) : hi.toFixed(0)) : '—';
+    const loDisp  = lo != null ? (useFahrenheit ? cToF(lo).toFixed(0) : lo.toFixed(0)) : '';
+    const tempU   = useFahrenheit ? '°' : '°';
+    const windDisp = avgWind > 0 ? `${avgWind.toFixed(0)} mph` : '';
+    const waveDisp = avgWave > 0 ? `~${mToFt(avgWave).toFixed(1)}ft` : '';
+    const icon     = wxIcon(avgWind, mToFt(avgWave));
+    const dayLabel = isToday ? 'Today' : days[d.date.getDay()];
+    const dateLabel = `${months[d.date.getMonth()]} ${d.date.getDate()}`;
+
+    return `<div class="day-chip${isToday?' is-today':''}${isSelected?' is-selected':''}"
+      onclick="setTimeOffset(${d.noonOffset ?? 24})">
+      <div class="dc-day">${dayLabel}</div>
+      <div class="dc-date">${dateLabel}</div>
+      <div class="dc-icon">${icon}</div>
+      <div class="dc-temps">${hiDisp}${tempU}<span class="dc-lo">${loDisp ? loDisp + tempU : ''}</span></div>
+      ${windDisp ? `<div class="dc-wind">💨 ${windDisp}</div>` : ''}
+      ${waveDisp ? `<div class="dc-wave">${waveDisp}</div>` : ''}
+    </div>`;
+  });
+
+  container.innerHTML = chips.join('');
+}
+
 function renderForecastScroll(initialLoad = false) {
   if(!wxHourlyData) return;
   const hours=wxHourlyData.hourly;
@@ -1594,9 +1737,9 @@ function renderForecastScroll(initialLoad = false) {
   let nowChipIdx=0;
 
   for(let i=0;i<hours.time.length;i++){
-    const t=new Date(hours.time[i]);
+    const t=parseLocalISO(hours.time[i]);
     const diffH=Math.round((t-now)/3600000);
-    if(diffH<-168||diffH>168) continue;
+    if(diffH<-24||diffH>14*24) continue;
 
     const isSelected = diffH === timeOffsetHours;
     const isNow = diffH === 0;
@@ -1605,8 +1748,12 @@ function renderForecastScroll(initialLoad = false) {
     const wh  = hours.wave_height ? hours.wave_height[i] : null;
     const tempDisp = t2m!=null ? (useFahrenheit ? `${parseFloat(cToF(t2m)).toFixed(0)}` : `${parseFloat(t2m).toFixed(0)}`) : '—';
     const tempU    = useFahrenheit ? '°F' : '°C';
-    const timeLabel = diffH===0 ? 'Now' : diffH>0 ? `+${diffH}h` : `${diffH}h`;
-    const waveDisp  = wh!=null ? `${mToFt(wh)}ft` : '';
+    // Label: "Now", short offset for nearby hours, weekday for distant days
+    const absH = Math.abs(diffH);
+    const timeLabel = diffH===0 ? 'Now'
+      : absH <= 48 ? (diffH>0?`+${diffH}h`:`${diffH}h`)
+      : t.toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'});
+    const waveDisp  = wh!=null ? `${mToFt(wh).toFixed(1)}ft` : '';
 
     chips.push({diffH, html:`
       <div class="forecast-chip${t<now?' is-past':''}${isNow?' is-now':''}${isSelected?' is-selected':''}"
@@ -1644,24 +1791,33 @@ async function fetchAll() {
 
   try {
     const [wx, marine, tideData, closestWtemp] = await Promise.all([
-      // Hourly: past 24h + next 24h
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=America%2FNew_York&past_days=7&forecast_days=7`).then(r=>r.json()),
-      fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_period,wave_direction,sea_surface_temperature&hourly=wave_height,wave_direction&timezone=America%2FNew_York&past_days=7&forecast_days=7`).then(r=>r.json()),
-      fetchTides(lat,lon),
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=auto&past_days=7&forecast_days=16`)
+        .then(r=>{ if(!r.ok) throw new Error(`weather ${r.status}`); return r.json(); })
+        .catch(e=>{ console.warn('Weather fetch failed:',e); return null; }),
+      fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_period,wave_direction,sea_surface_temperature&hourly=wave_height,wave_direction&timezone=auto&past_days=7&forecast_days=16`)
+        .then(r=>{ if(!r.ok) throw new Error(`marine ${r.status}`); return r.json(); })
+        .catch(e=>{ console.warn('Marine fetch failed:',e); return null; }),
+      fetchTides(lat,lon).catch(e=>{ console.warn('Tide fetch failed:',e); return {}; }),
       fetchClosestNOAAWaterTemp(lat, lon).catch(()=>null),
     ]);
 
-    const c=wx.current, mc=marine.current;
+    if (!wx) {
+      setStatus('error', 'Weather data unavailable — try again');
+      setSkeleton(false);
+      return;
+    }
+
+    const c=wx.current, mc=marine?.current;
 
     // Store hourly data (merge marine wave_height into wx hourly)
     wxHourlyData=wx;
-    if(marine.hourly&&marine.hourly.wave_height) wxHourlyData.hourly.wave_height=marine.hourly.wave_height;
+    if(marine?.hourly?.wave_height) wxHourlyData.hourly.wave_height=marine.hourly.wave_height;
 
     // Air temp
     lastTempC=c.temperature_2m; lastFeelsC=c.apparent_temperature;
 
-    // Water temp priority: 1) nearest NDBC buoy  2) NOAA tide station  3) marine API SST
-    const noaaWtemp = tideData.wtempRes && tideData.wtempRes.data && tideData.wtempRes.data.length
+    // Water temp priority: 1) nearest NOAA station  2) NOAA tide station  3) marine API SST
+    const noaaWtemp = tideData?.wtempRes?.data?.length
       ? parseFloat(tideData.wtempRes.data[tideData.wtempRes.data.length - 1].v)
       : null;
 
@@ -1670,8 +1826,8 @@ async function fetchAll() {
       document.getElementById('waterSub').textContent = `NOAA ${closestWtemp.stationId} · ${closestWtemp.stationName} · ${closestWtemp.distMi}mi away`;
     } else if (noaaWtemp !== null && !isNaN(noaaWtemp)) {
       lastWaterC = (noaaWtemp - 32) * 5 / 9;
-      document.getElementById('waterSub').textContent = `NOAA · ${tideData.station.name}`;
-    } else if (mc && mc.sea_surface_temperature != null) {
+      document.getElementById('waterSub').textContent = `NOAA · ${tideData.station?.name || 'tide station'}`;
+    } else if (mc?.sea_surface_temperature != null) {
       lastWaterC = mc.sea_surface_temperature;
       document.getElementById('waterSub').textContent = 'sea surface temperature';
     } else {
@@ -1697,7 +1853,7 @@ async function fetchAll() {
 
     // Waves
     if(mc&&mc.wave_height!=null){
-      document.getElementById('waveVal').textContent=mToFt(parseFloat(mc.wave_height));
+      document.getElementById('waveVal').textContent=mToFt(parseFloat(mc.wave_height)).toFixed(1);
       const per=mc.wave_period?`${parseFloat(mc.wave_period).toFixed(1)}s period`:'';
       const wdir=mc.wave_direction!=null?` · from ${degToCard(mc.wave_direction)}`:'';
       document.getElementById('waveSub').textContent=per+wdir;
@@ -1716,6 +1872,7 @@ async function fetchAll() {
     }
 
     // Forecast scroll — initial load, auto-scroll to Now
+    renderDayForecast();
     renderForecastScroll(true);
 
     setSkeleton(false);
@@ -1724,8 +1881,8 @@ async function fetchAll() {
     document.getElementById('ts').textContent='Last updated · '+now;
 
   } catch(e) {
-    console.error(e);
-    setStatus('error','Failed to fetch — check connection');
+    console.error('fetchAll error:', e);
+    setStatus('error', e?.message?.includes('fetch') ? 'Network error — check connection' : `Error: ${e.message || 'unknown'}`);
     setSkeleton(false);
     document.getElementById('ts').textContent='— Update failed —';
   }
@@ -1733,56 +1890,86 @@ async function fetchAll() {
 
 // ─── Scroll strip: click-drag + contain scroll to strip only ─────────────────
 function initForecastScrollDrag() {
-  let dragging = false, startX = 0, startLeft = 0;
+  // Generic drag-scroll factory — used for both strips
+  function makeDraggable(getId) {
+    let dragging = false, startX = 0, startLeft = 0, moved = false;
 
-  function strip() { return document.getElementById('forecastScroll'); }
-
-  // Block wheel from scrolling the page when pointer is over the strip.
-  // Must be on window with passive:false to be able to preventDefault.
-  window.addEventListener('wheel', function(e) {
-    const s = strip();
-    if (!s) return;
-    // Don't intercept wheel events over the map — let Leaflet zoom
-    if (e.target && e.target.closest && e.target.closest('#map, .map-card, .leaflet-container')) return;
-    const r = s.getBoundingClientRect();
-    const overStrip = e.clientX >= r.left && e.clientX <= r.right &&
-                      e.clientY >= r.top  && e.clientY <= r.bottom;
-    if (overStrip) {
+    window.addEventListener('mousedown', function(e) {
+      const s = getId();
+      if (!s) return;
+      const r = s.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right &&
+                     e.clientY >= r.top  && e.clientY <= r.bottom;
+      if (!inside) return;
+      dragging  = true;
+      moved     = false;
+      startX    = e.clientX;
+      startLeft = s.scrollLeft;
+      s.classList.add('is-dragging');
       e.preventDefault();
-      e.stopPropagation();
-      s.scrollLeft += e.deltaY || e.deltaX;
-    }
-  }, { passive: false, capture: true });
+    }, { capture: true });
 
-  // Mousedown inside strip → start drag
-  window.addEventListener('mousedown', function(e) {
-    const s = strip();
-    if (!s) return;
-    const r = s.getBoundingClientRect();
-    const inside = e.clientX >= r.left && e.clientX <= r.right &&
-                   e.clientY >= r.top  && e.clientY <= r.bottom;
-    if (!inside) return;
-    dragging  = true;
-    startX    = e.clientX;
-    startLeft = s.scrollLeft;
-    s.classList.add('is-dragging');
-    e.preventDefault();
-    e.stopPropagation();
-  }, { capture: true });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      const s = getId();
+      if (!s) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 4) moved = true;
+      s.scrollLeft = startLeft - dx;
+      e.preventDefault();
+    }, { capture: true });
 
-  window.addEventListener('mousemove', function(e) {
-    if (!dragging) return;
-    const s = strip();
-    if (s) s.scrollLeft = startLeft - (e.clientX - startX);
-    e.preventDefault();
-  }, { capture: true });
+    window.addEventListener('mouseup', function(e) {
+      if (!dragging) return;
+      dragging = false;
+      const s = getId();
+      if (s) s.classList.remove('is-dragging');
+      // If we dragged significantly, swallow the subsequent click so chips don't fire
+      if (moved) e.stopPropagation();
+      moved = false;
+    }, { capture: true });
 
-  window.addEventListener('mouseup', function() {
-    if (!dragging) return;
-    dragging = false;
-    const s = strip();
-    if (s) s.classList.remove('is-dragging');
-  }, { capture: true });
+    // Wheel scroll over strip
+    window.addEventListener('wheel', function(e) {
+      const s = getId();
+      if (!s) return;
+      if (e.target && e.target.closest && e.target.closest('#map, .map-card, .leaflet-container')) return;
+      const r = s.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top  && e.clientY <= r.bottom) {
+        e.preventDefault();
+        e.stopPropagation();
+        s.scrollLeft += e.deltaY || e.deltaX;
+      }
+    }, { passive: false, capture: true });
+
+    // Touch support
+    let touchStartX = 0, touchStartLeft = 0;
+    window.addEventListener('touchstart', function(e) {
+      const s = getId();
+      if (!s) return;
+      const t = e.touches[0];
+      const r = s.getBoundingClientRect();
+      if (t.clientX >= r.left && t.clientX <= r.right &&
+          t.clientY >= r.top  && t.clientY <= r.bottom) {
+        touchStartX    = t.clientX;
+        touchStartLeft = s.scrollLeft;
+      }
+    }, { passive: true });
+    window.addEventListener('touchmove', function(e) {
+      const s = getId();
+      if (!s) return;
+      const t = e.touches[0];
+      const r = s.getBoundingClientRect();
+      if (t.clientX >= r.left && t.clientX <= r.right &&
+          t.clientY >= r.top  && t.clientY <= r.bottom) {
+        s.scrollLeft = touchStartLeft - (t.clientX - touchStartX);
+      }
+    }, { passive: true });
+  }
+
+  makeDraggable(() => document.getElementById('forecastScroll'));
+  makeDraggable(() => document.getElementById('dayForecastScroll'));
 }
 
 // ─── Tide chart: drag horizontally to scrub time (−24h … +24h) ───────────────
@@ -1812,7 +1999,7 @@ function initTideChartDrag() {
     if (!active) return;
     const dx      = e.clientX - dragStartX;
     const dhour   = -dx / pxPerHour();
-    const clamped = Math.max(-168, Math.min(168, Math.round(dragStartOffset + dhour)));
+    const clamped = Math.max(-168, Math.min(336, Math.round(dragStartOffset + dhour)));
     if (clamped === timeOffsetHours) return;
     // setTimeOffset updates slider, badge, weather, tide display — everything
     setTimeOffset(clamped);
