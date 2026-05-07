@@ -323,22 +323,28 @@ header {
 .day-forecast-scroll::-webkit-scrollbar { height: 3px; }
 .day-forecast-scroll::-webkit-scrollbar-thumb { background: rgba(74,144,217,0.25); border-radius: 2px; }
 .day-chip {
-  flex: 0 0 auto; min-width: 78px; max-width: 90px;
+  flex: 0 0 auto; min-width: 100px; max-width: 115px;
   background: rgba(74,144,217,0.06); border: 1px solid rgba(74,144,217,0.15);
-  border-radius: 8px; padding: 0.6rem 0.45rem; cursor: pointer;
+  border-radius: 8px; padding: 0.75rem 0.6rem; cursor: pointer;
   text-align: center; transition: background 0.18s, border-color 0.18s, transform 0.15s;
-  display: flex; flex-direction: column; gap: 0.28rem; align-items: center;
+  display: flex; flex-direction: column; gap: 0.3rem; align-items: center;
 }
 .day-chip:hover { background: rgba(74,144,217,0.14); border-color: rgba(74,144,217,0.4); transform: translateY(-2px); }
 .day-chip.is-today { border-color: rgba(232,160,48,0.55); background: rgba(232,160,48,0.07); }
 .day-chip.is-selected { border-color: var(--sky); background: rgba(74,144,217,0.18); box-shadow: 0 0 0 1px rgba(74,144,217,0.3); }
-.dc-day   { font-size: 0.52rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--foam); opacity: 0.7; }
-.dc-date  { font-size: 0.44rem; color: var(--foam); opacity: 0.4; margin-top: -0.1rem; }
-.dc-icon  { font-size: 1.05rem; line-height: 1; margin: 0.05rem 0; }
-.dc-temps { font-size: 0.62rem; color: var(--white); font-weight: 600; letter-spacing: 0.02em; }
-.dc-lo    { opacity: 0.45; font-weight: 400; margin-left: 0.2rem; font-size: 0.52rem; }
-.dc-wind  { font-size: 0.44rem; color: var(--foam); opacity: 0.6; letter-spacing: 0.04em; }
-.dc-wave  { font-size: 0.44rem; color: var(--sky); opacity: 0.75; }
+.dc-day   { font-size: 0.55rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--foam); opacity: 0.7; }
+.dc-date  { font-size: 0.48rem; color: var(--foam); opacity: 0.4; margin-top: -0.1rem; }
+.dc-icon  { font-size: 1.25rem; line-height: 1; margin: 0.1rem 0; }
+.dc-cond  { font-size: 0.46rem; color: var(--foam); opacity: 0.6; letter-spacing: 0.04em; text-align: center; }
+.dc-temps { font-size: 0.7rem; color: var(--white); font-weight: 600; letter-spacing: 0.02em; }
+.dc-lo    { opacity: 0.45; font-weight: 400; margin-left: 0.25rem; font-size: 0.58rem; }
+.dc-rain  { font-size: 0.48rem; color: #7ec8e3; opacity: 0.9; }
+.dc-wind  { font-size: 0.48rem; color: var(--foam); opacity: 0.6; letter-spacing: 0.04em; }
+.dc-wave  { font-size: 0.48rem; color: var(--sky); opacity: 0.75; }
+
+/* Hourly chip weather + rain */
+.fc-wx   { font-size: 1.1rem; line-height: 1; margin: 0.15rem 0; }
+.fc-rain { font-size: 0.48rem; color: #7ec8e3; opacity: 0.9; margin-top: 0.1rem; }
 
 .forecast-scroll {
   display: flex;
@@ -350,8 +356,7 @@ header {
   user-select: none;
   overscroll-behavior: contain;
   touch-action: pan-x;
-  /* Fixed height forces browser to treat this as a scroll container, not the page */
-  height: 110px;
+  height: 155px;
   align-items: stretch;
 }
 .forecast-scroll.is-dragging { cursor: grabbing; }
@@ -365,8 +370,9 @@ header {
 .forecast-chip {
   flex: 0 0 auto; scroll-snap-align: start;
   background: rgba(13,32,69,0.55); border: 1px solid rgba(74,144,217,0.12);
-  border-radius: 4px; padding: 0.55rem 0.7rem; text-align: center; min-width: 68px;
+  border-radius: 4px; padding: 0.65rem 0.85rem; text-align: center; min-width: 80px;
   cursor: pointer; transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+  display: flex; flex-direction: column; justify-content: center;
 }
 .forecast-chip.is-selected {
   border-color: var(--amber) !important;
@@ -376,10 +382,10 @@ header {
 .forecast-chip:hover:not(.is-selected) { border-color: rgba(74,144,217,0.4); background: rgba(74,144,217,0.08); }
 .forecast-chip.is-now { border-color: var(--amber); background: rgba(232,160,48,0.08); }
 .forecast-chip.is-past { opacity: 0.5; }
-.forecast-chip .fc-time { font-size: 0.48rem; color: var(--foam); opacity: 0.5; letter-spacing: 0.08em; margin-bottom: 0.3rem; }
-.forecast-chip .fc-temp { font-family: 'Bebas Neue', sans-serif; font-size: 1.3rem; line-height: 1; color: var(--white); }
-.forecast-chip .fc-wind { font-size: 0.46rem; color: var(--foam); opacity: 0.6; margin-top: 0.2rem; }
-.forecast-chip .fc-wave { font-size: 0.44rem; color: #7dd8d8; opacity: 0.7; margin-top: 0.1rem; }
+.forecast-chip .fc-time { font-size: 0.5rem; color: var(--foam); opacity: 0.5; letter-spacing: 0.08em; margin-bottom: 0.2rem; }
+.forecast-chip .fc-temp { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; line-height: 1; color: var(--white); }
+.forecast-chip .fc-wind { font-size: 0.48rem; color: var(--foam); opacity: 0.6; margin-top: 0.2rem; }
+.forecast-chip .fc-wave { font-size: 0.46rem; color: #7dd8d8; opacity: 0.7; margin-top: 0.1rem; }
 
 /* Tide status */
 .tide-status-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
@@ -1068,7 +1074,8 @@ document.getElementById('searchInput').addEventListener('input', () => {
     }
   }, 500);
 });
-// ─── Live Clock ───────────────────────────────────────────────────────────────
+// Shared drag-suppression flag — set true during drag, cleared after click fires
+let wasDragging = false;
 function tickClock() {
   const base = (CHART && CHART.realNow) ? CHART.realNow : new Date();
   const display = new Date(base.getTime() + (timeOffsetHours || 0) * 3600000);
@@ -1475,13 +1482,13 @@ function stepTime(delta) {
 }
 
 function setTimeOffset(h) {
-  timeOffsetHours = Math.max(-168, Math.min(336, h));
+  timeOffsetHours = Math.max(-168, Math.min(336, Math.round(h)));
 
   updateSliderVisual(timeOffsetHours);
 
   const badge=timeOffsetHours===0?'NOW':timeOffsetHours>0?`+${timeOffsetHours}H`:`${timeOffsetHours}H`;
   document.getElementById('timeOffsetBadge').textContent=badge;
-  const atTime=new Date(Date.now()+timeOffsetHours*3600000);
+  const nowH=new Date(); nowH.setMinutes(0,0,0); const atTime=new Date(nowH.getTime()+timeOffsetHours*3600000);
   document.getElementById('timeNavDisplay').textContent=timeOffsetHours===0?'Now':atTime.toLocaleTimeString('en-US',{weekday:'short',hour:'2-digit',minute:'2-digit'});
 
   document.querySelectorAll('.time-preset-btn').forEach(btn=>{
@@ -1578,7 +1585,7 @@ function initTimeSlider() {
 function renderWeatherAtOffset() {
   if(!wxHourlyData) return;
   const hours=wxHourlyData.hourly;
-  const atTime=new Date(Date.now()+timeOffsetHours*3600000);
+  const _nh=new Date(); _nh.setMinutes(0,0,0); const atTime=new Date(_nh.getTime()+timeOffsetHours*3600000);
   // Find closest hourly index using local-time parsing (Open-Meteo times have no Z suffix)
   let bestIdx=0,bestDiff=Infinity;
   hours.time.forEach((t,i)=>{
@@ -1597,11 +1604,19 @@ function renderWeatherAtOffset() {
   const wg=hours.wind_gusts_10m[bestIdx];
   const wd=hours.wind_direction_10m[bestIdx];
   const wh=hours.wave_height?hours.wave_height[bestIdx]:null;
+  const wcode=hours.weather_code?hours.weather_code[bestIdx]:null;
+  const precip=hours.precipitation_probability?hours.precipitation_probability[bestIdx]:null;
 
   // Temp
   if(t2m!=null){
     lastTempC=t2m; lastFeelsC=app;
     renderTemps();
+  }
+  // Weather condition + rain chance on the temp sub-label
+  if(wcode!=null){
+    const wx=wmoWeather(wcode);
+    const rainStr=precip!=null?` · 🌧 ${precip}% rain`:'';
+    document.getElementById('tempSub').textContent=`${wx.emoji} ${wx.label}${rainStr}`;
   }
   // Wind
   if(ws!=null){
@@ -1645,7 +1660,31 @@ function wxIcon(windMph, waveHft) {
   return '☀️';
 }
 
-// ─── Date/time helpers ────────────────────────────────────────────────────────
+// ─── WMO weather code → label + emoji ────────────────────────────────────────
+function wmoWeather(code) {
+  if (code == null) return { label: 'Unknown', emoji: '🌡️' };
+  const c = parseInt(code);
+  if (c === 0)              return { label: 'Clear sky',         emoji: '☀️' };
+  if (c === 1)              return { label: 'Mainly clear',      emoji: '🌤️' };
+  if (c === 2)              return { label: 'Partly cloudy',     emoji: '⛅' };
+  if (c === 3)              return { label: 'Overcast',          emoji: '☁️' };
+  if (c >= 45 && c <= 48)  return { label: 'Foggy',             emoji: '🌫️' };
+  if (c >= 51 && c <= 55)  return { label: 'Drizzle',           emoji: '🌦️' };
+  if (c >= 56 && c <= 57)  return { label: 'Freezing drizzle',  emoji: '🌧️' };
+  if (c >= 61 && c <= 63)  return { label: 'Rain',              emoji: '🌧️' };
+  if (c === 65)             return { label: 'Heavy rain',        emoji: '🌧️' };
+  if (c >= 66 && c <= 67)  return { label: 'Freezing rain',     emoji: '🌨️' };
+  if (c >= 71 && c <= 73)  return { label: 'Snow',              emoji: '❄️' };
+  if (c === 75)             return { label: 'Heavy snow',        emoji: '❄️' };
+  if (c === 77)             return { label: 'Snow grains',       emoji: '🌨️' };
+  if (c >= 80 && c <= 82)  return { label: 'Rain showers',      emoji: '🌦️' };
+  if (c >= 85 && c <= 86)  return { label: 'Snow showers',      emoji: '🌨️' };
+  if (c === 95)             return { label: 'Thunderstorm',      emoji: '⛈️' };
+  if (c >= 96 && c <= 99)  return { label: 'T-storm w/ hail',   emoji: '⛈️' };
+  return { label: 'Mixed',  emoji: '🌡️' };
+}
+
+
 // Open-Meteo and NOAA return "YYYY-MM-DDTHH:mm" with no Z — treat as local time
 function parseLocalISO(s) {
   const [date, time] = s.split('T');
@@ -1661,42 +1700,41 @@ function localDateKey(dt) {
 function renderDayForecast() {
   if (!wxHourlyData) return;
   const hours = wxHourlyData.hourly;
-  const now   = new Date();
-  const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now     = new Date();
+  // Always anchor to top of current hour — same reference as chips
+  const nowHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0, 0);
+  const days    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  const dayMap = new Map(); // "YYYY-MM-DD" → { date, temps, winds, waves, noonOffset }
+  const dayMap = new Map();
 
   for (let i = 0; i < hours.time.length; i++) {
-    const t     = parseLocalISO(hours.time[i]);
-    const diffH = Math.round((t - now) / 3600000);
-    if (diffH < -1 || diffH > 14 * 24) continue;  // up to 2 weeks ahead
+    const t = parseLocalISO(hours.time[i]);
+    if (t.getMinutes() !== 0) continue; // only :00 entries
+    const diffH = Math.round((t - nowHour) / 3600000);
+    if (diffH < -1 || diffH > 14 * 24) continue;
 
     const key = localDateKey(t);
-    if (!dayMap.has(key)) dayMap.set(key, { date: t, temps: [], winds: [], waves: [], noonOffset: null });
+    if (!dayMap.has(key)) dayMap.set(key, { date: t, temps: [], winds: [], waves: [], wcodes: [], precips: [], midnightOffset: null });
     const d = dayMap.get(key);
 
     if (hours.temperature_2m[i]  != null) d.temps.push(hours.temperature_2m[i]);
     if (hours.wind_speed_10m[i]  != null) d.winds.push(hours.wind_speed_10m[i]);
     if (hours.wave_height && hours.wave_height[i] != null) d.waves.push(hours.wave_height[i]);
+    if (hours.weather_code && hours.weather_code[i] != null) d.wcodes.push(hours.weather_code[i]);
+    if (hours.precipitation_probability && hours.precipitation_probability[i] != null) d.precips.push(hours.precipitation_probability[i]);
 
-    // Track the hour closest to noon as the click-jump target
-    const hr = t.getHours();
-    if (d.noonOffset === null || Math.abs(hr - 12) < Math.abs(12 - (12 - Math.abs(hr - 12)))) {
-      const existing = d.noonOffset !== null
-        ? parseLocalISO(hours.time[i - (diffH - d.noonOffset)]).getHours()
-        : 99;
-      if (d.noonOffset === null || Math.abs(hr - 12) < Math.abs(existing - 12)) {
-        d.noonOffset = diffH;
-      }
+    // Midnight (00:00) of this day = first hour of the day
+    if (d.midnightOffset === null && t.getHours() === 0) {
+      d.midnightOffset = diffH;
     }
   }
 
   const container = document.getElementById('dayForecastScroll');
   if (!container) return;
 
-  const todayKey    = localDateKey(now);
-  const selectedKey = localDateKey(new Date(now.getTime() + timeOffsetHours * 3600000));
+  const todayKey    = localDateKey(nowHour);
+  const selectedKey = localDateKey(new Date(nowHour.getTime() + timeOffsetHours * 3600000));
 
   const chips = [...dayMap.entries()].slice(0, 14).map(([key, d]) => {
     const isToday    = key === todayKey;
@@ -1705,21 +1743,30 @@ function renderDayForecast() {
     const lo  = d.temps.length ? Math.min(...d.temps) : null;
     const avgWind = d.winds.length ? d.winds.reduce((a,b)=>a+b,0)/d.winds.length : 0;
     const avgWave = d.waves.length ? d.waves.reduce((a,b)=>a+b,0)/d.waves.length : 0;
+    const maxRain = d.precips.length ? Math.max(...d.precips) : 0;
+    // Pick the most severe weather code of the day
+    const dominantCode = d.wcodes.length ? d.wcodes.reduce((prev, cur) => (cur > prev ? cur : prev), 0) : null;
+    const wx = wmoWeather(dominantCode);
     const hiDisp  = hi != null ? (useFahrenheit ? cToF(hi).toFixed(0) : hi.toFixed(0)) : '—';
     const loDisp  = lo != null ? (useFahrenheit ? cToF(lo).toFixed(0) : lo.toFixed(0)) : '';
-    const tempU   = useFahrenheit ? '°' : '°';
+    const tempU   = '°';
     const windDisp = avgWind > 0 ? `${avgWind.toFixed(0)} mph` : '';
     const waveDisp = avgWave > 0 ? `~${mToFt(avgWave).toFixed(1)}ft` : '';
-    const icon     = wxIcon(avgWind, mToFt(avgWave));
+    const rainDisp = maxRain > 0 ? `🌧 ${maxRain}%` : '';
     const dayLabel = isToday ? 'Today' : days[d.date.getDay()];
     const dateLabel = `${months[d.date.getMonth()]} ${d.date.getDate()}`;
 
+    // Fallback: compute offset to midnight of this day if 00:00 wasn't in the fetched window
+    const jumpOffset = d.midnightOffset ?? Math.round((new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 0, 0, 0) - nowHour) / 3600000);
+
     return `<div class="day-chip${isToday?' is-today':''}${isSelected?' is-selected':''}"
-      onclick="setTimeOffset(${d.noonOffset ?? 24})">
+      onclick="if(!wasDragging)setTimeOffset(${jumpOffset})">
       <div class="dc-day">${dayLabel}</div>
       <div class="dc-date">${dateLabel}</div>
-      <div class="dc-icon">${icon}</div>
+      <div class="dc-icon">${wx.emoji}</div>
+      <div class="dc-cond">${wx.label}</div>
       <div class="dc-temps">${hiDisp}${tempU}<span class="dc-lo">${loDisp ? loDisp + tempU : ''}</span></div>
+      ${rainDisp ? `<div class="dc-rain">${rainDisp}</div>` : ''}
       ${windDisp ? `<div class="dc-wind">💨 ${windDisp}</div>` : ''}
       ${waveDisp ? `<div class="dc-wave">${waveDisp}</div>` : ''}
     </div>`;
@@ -1736,35 +1783,46 @@ function renderForecastScroll(initialLoad = false) {
   const chips=[];
   let nowChipIdx=0;
 
+  // Anchor to start of current hour so all chip IDs are clean integers (0 = this hour, 1 = next, etc.)
+  const nowHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0, 0);
+
   for(let i=0;i<hours.time.length;i++){
     const t=parseLocalISO(hours.time[i]);
-    const diffH=Math.round((t-now)/3600000);
+    // Only include exact :00 entries (Open-Meteo is always hourly, but guard anyway)
+    if(t.getMinutes() !== 0) continue;
+    const diffH = Math.round((t - nowHour) / 3600000);
     if(diffH<-24||diffH>14*24) continue;
 
+    const isNow     = diffH === 0;
     const isSelected = diffH === timeOffsetHours;
-    const isNow = diffH === 0;
-    const t2m = hours.temperature_2m[i];
-    const ws  = hours.wind_speed_10m[i];
-    const wh  = hours.wave_height ? hours.wave_height[i] : null;
-    const tempDisp = t2m!=null ? (useFahrenheit ? `${parseFloat(cToF(t2m)).toFixed(0)}` : `${parseFloat(t2m).toFixed(0)}`) : '—';
+    const t2m  = hours.temperature_2m[i];
+    const ws   = hours.wind_speed_10m[i];
+    const wh   = hours.wave_height ? hours.wave_height[i] : null;
+    const wcode = hours.weather_code ? hours.weather_code[i] : null;
+    const precip = hours.precipitation_probability ? hours.precipitation_probability[i] : null;
+    const wx   = wmoWeather(wcode);
+    const tempDisp = t2m!=null ? (useFahrenheit ? `${cToF(t2m).toFixed(0)}` : `${t2m.toFixed(0)}`) : '—';
     const tempU    = useFahrenheit ? '°F' : '°C';
-    // Label: "Now", short offset for nearby hours, weekday for distant days
     const absH = Math.abs(diffH);
-    const timeLabel = diffH===0 ? 'Now'
+    const timeLabel = isNow ? 'Now'
       : absH <= 48 ? (diffH>0?`+${diffH}h`:`${diffH}h`)
       : t.toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'});
-    const waveDisp  = wh!=null ? `${mToFt(wh).toFixed(1)}ft` : '';
+    const clockLabel = t.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    const waveDisp = wh!=null ? `${mToFt(wh).toFixed(1)}ft` : '';
+    const rainDisp = precip!=null && precip>0 ? `🌧 ${precip}%` : '';
 
     chips.push({diffH, html:`
-      <div class="forecast-chip${t<now?' is-past':''}${isNow?' is-now':''}${isSelected?' is-selected':''}"
-           id="chip-${diffH}" onclick="setTimeOffset(${diffH})">
-        <div class="fc-time">${timeLabel}<br>${t.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="forecast-chip${t<nowHour?' is-past':''}${isNow?' is-now':''}${isSelected?' is-selected':''}"
+           id="chip-${diffH}" onclick="if(!wasDragging)setTimeOffset(${diffH})">
+        <div class="fc-time">${timeLabel}<br>${clockLabel}</div>
+        <div class="fc-wx">${wx.emoji}</div>
         <div class="fc-temp">${tempDisp}<span style="font-size:0.55rem;opacity:0.6">${tempU}</span></div>
         <div class="fc-wind">${ws!=null?`${ws.toFixed(0)}mph ${degToCard(hours.wind_direction_10m[i]||0)}`:'—'}</div>
+        ${rainDisp?`<div class="fc-rain">${rainDisp}</div>`:''}
         ${waveDisp?`<div class="fc-wave">~${waveDisp}</div>`:''}
       </div>`
     });
-    if(Math.abs(diffH)<=1&&!nowChipIdx) nowChipIdx=chips.length-1;
+    if(isNow) nowChipIdx=chips.length-1;
   }
 
   container.innerHTML = chips.map(c=>c.html).join('');
@@ -1791,7 +1849,7 @@ async function fetchAll() {
 
   try {
     const [wx, marine, tideData, closestWtemp] = await Promise.all([
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=auto&past_days=7&forecast_days=16`)
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,precipitation&hourly=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,precipitation_probability,precipitation&wind_speed_unit=mph&timezone=auto&past_days=7&forecast_days=16`)
         .then(r=>{ if(!r.ok) throw new Error(`weather ${r.status}`); return r.json(); })
         .catch(e=>{ console.warn('Weather fetch failed:',e); return null; }),
       fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height,wave_period,wave_direction,sea_surface_temperature&hourly=wave_height,wave_direction&timezone=auto&past_days=7&forecast_days=16`)
@@ -1924,8 +1982,11 @@ function initForecastScrollDrag() {
       dragging = false;
       const s = getId();
       if (s) s.classList.remove('is-dragging');
-      // If we dragged significantly, swallow the subsequent click so chips don't fire
-      if (moved) e.stopPropagation();
+      if (moved) {
+        wasDragging = true;
+        // Clear after the click event has fired
+        setTimeout(() => { wasDragging = false; }, 0);
+      }
       moved = false;
     }, { capture: true });
 
@@ -1944,7 +2005,7 @@ function initForecastScrollDrag() {
     }, { passive: false, capture: true });
 
     // Touch support
-    let touchStartX = 0, touchStartLeft = 0;
+    let touchStartX = 0, touchStartLeft = 0, touchMoved = false;
     window.addEventListener('touchstart', function(e) {
       const s = getId();
       if (!s) return;
@@ -1954,6 +2015,7 @@ function initForecastScrollDrag() {
           t.clientY >= r.top  && t.clientY <= r.bottom) {
         touchStartX    = t.clientX;
         touchStartLeft = s.scrollLeft;
+        touchMoved     = false;
       }
     }, { passive: true });
     window.addEventListener('touchmove', function(e) {
@@ -1963,8 +2025,17 @@ function initForecastScrollDrag() {
       const r = s.getBoundingClientRect();
       if (t.clientX >= r.left && t.clientX <= r.right &&
           t.clientY >= r.top  && t.clientY <= r.bottom) {
-        s.scrollLeft = touchStartLeft - (t.clientX - touchStartX);
+        const dx = t.clientX - touchStartX;
+        if (Math.abs(dx) > 4) touchMoved = true;
+        s.scrollLeft = touchStartLeft - dx;
       }
+    }, { passive: true });
+    window.addEventListener('touchend', function() {
+      if (touchMoved) {
+        wasDragging = true;
+        setTimeout(() => { wasDragging = false; }, 0);
+      }
+      touchMoved = false;
     }, { passive: true });
   }
 
