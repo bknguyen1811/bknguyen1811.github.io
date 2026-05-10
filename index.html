@@ -258,7 +258,7 @@ header {
 .map-label-text { font-size: 0.52rem; color: var(--text); }
 .map-coords-text { font-size: 0.46rem; }
 .map-click-hint { font-size: 0.44rem; opacity: 0.5; }
-#map { height: 260px; }
+#map { height: 340px; }
 .map-pin-btn {
   width: 32px; height: 32px; border-radius: 2px;
   background: var(--bg2); border: 1px solid var(--border);
@@ -311,7 +311,7 @@ header {
 /* Tide chart */
 .tide-chart-wrap { margin: 0.75rem 0; position: relative; }
 .tide-chart-label { font-size: 0.44rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 0.35rem; display: flex; justify-content: space-between; }
-#tideChartSvg { width: 100%; height: 100px; display: block; cursor: ew-resize; touch-action: none; user-select: none; }
+#tideChartSvg { width: 100%; height: 160px; display: block; cursor: ew-resize; touch-action: none; user-select: none; }
 .tide-now-line { stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .tide-chart-drag-hint { font-size: 0.44rem; color: var(--text-mute); }
 
@@ -486,7 +486,6 @@ header {
 .forecast-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 /* Tide chart — draggable to scrub time, pointer capture prevents page scroll */
-#tideChartSvg { cursor: ew-resize; touch-action: none; user-select: none; display: block; }
 .tide-chart-drag-hint { font-size: 0.44rem; color: var(--text-mute); margin-left: 0.5rem; }
 .forecast-chip {
   flex: 0 0 auto; scroll-snap-align: start;
@@ -516,7 +515,7 @@ header {
 .tide-current-ft { font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem; line-height: 1; color: var(--text); }
 
 /* ── Map card ── */
-.map-card { border: 1px solid var(--border); border-radius: 2px; overflow: hidden; position: relative; height: 300px; transition: border-color 0.2s; }
+.map-card { border: 1px solid var(--border); border-radius: 2px; overflow: hidden; position: relative; height: 340px; transition: border-color 0.2s; }
 .map-card:hover { border-color: var(--border-hi); }
 .map-label { position: absolute; top: 0; left: 0; right: 0; z-index: 10; padding: 0.4rem 0.8rem; background: rgba(15,25,35,0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
 [data-theme="light"] .map-label { background: rgba(240,234,216,0.92); }
@@ -1370,7 +1369,7 @@ async function fetchTides(lat,lon) {
 // The full curve is rendered at a fixed px/hour scale into a virtual canvas.
 // Scrubbing translates the entire <g> so the amber line (fixed at x=400) always
 // points at the viewed time. Curve proportions never change.
-const CHART = { PX_PER_HOUR: 20, H: 110, PAD: 8, realNow: null };
+const CHART = { PX_PER_HOUR: 20, H: 160, PAD: 12, realNow: null };
 
 function renderTideChart(atTime) {
   if (!tideCurveData.length) return;
@@ -1434,6 +1433,8 @@ function renderTideChart(atTime) {
 
   const svg = document.getElementById('tideChartSvg');
   if (!svg) return;
+  svg.setAttribute('viewBox', `0 0 800 ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
 
   svg.innerHTML = `
     <defs>
